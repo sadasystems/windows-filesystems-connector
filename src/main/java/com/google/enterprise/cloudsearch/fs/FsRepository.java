@@ -23,9 +23,7 @@ import static java.util.Locale.ENGLISH;
 
 import com.google.api.client.http.FileContent;
 import com.google.api.client.util.DateTime;
-import com.google.api.services.cloudsearch.v1.model.Item;
-import com.google.api.services.cloudsearch.v1.model.ItemMetadata;
-import com.google.api.services.cloudsearch.v1.model.PushItem;
+import com.google.api.services.cloudsearch.v1.model.*;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
@@ -33,6 +31,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.enterprise.cloudsearch.sdk.CheckpointCloseableIterable;
 import com.google.enterprise.cloudsearch.sdk.CheckpointCloseableIterableImpl;
@@ -43,9 +42,11 @@ import com.google.enterprise.cloudsearch.sdk.config.Configuration;
 import com.google.enterprise.cloudsearch.sdk.indexing.Acl;
 import com.google.enterprise.cloudsearch.sdk.indexing.Acl.InheritanceType;
 import com.google.enterprise.cloudsearch.sdk.indexing.DefaultAcl.DefaultAclMode;
+import com.google.enterprise.cloudsearch.sdk.indexing.IndexingItemBuilder;
 import com.google.enterprise.cloudsearch.sdk.indexing.IndexingItemBuilder.ItemType;
 import com.google.enterprise.cloudsearch.sdk.indexing.IndexingService.ContentFormat;
 import com.google.enterprise.cloudsearch.sdk.indexing.IndexingService.RequestMode;
+import com.google.enterprise.cloudsearch.sdk.indexing.StructuredData;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.ApiOperation;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.ApiOperations;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.AsyncApiOperation;
@@ -53,10 +54,13 @@ import com.google.enterprise.cloudsearch.sdk.indexing.template.PushItems;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.Repository;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryContext;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryDoc;
+import com.sadasystems.gcs.utils.EntityRecognition;
+import com.sadasystems.gcs.utils.TikaUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.tika.exception.TikaException;
+import org.xml.sax.SAXException;
 
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -254,6 +258,10 @@ public class FsRepository implements Repository {
   /** Properties filename to specify mime types. */
   private static final String MIME_TYPE_PROP_FILENAME = "mime-type.properties";
 
+  private static final String ENTITY_RECOGNITION_FOLDER = "entityRecognitionFolder";
+  private static final String MAX_FILE_SIZE_MB_TO_PARSE = "maxFileSizeMBToParse";
+
+
   /* mime type mapping */
   private static final Properties mimeTypeProperties = getMimeTypes();
 
@@ -339,7 +347,15 @@ public class FsRepository implements Repository {
   /** ExecutorService for asychronous pushing of large directory content. */
   private ExecutorService asyncDirectoryPusherService;
 
-  public FsRepository() {
+  /** Look for entities within content of files **/
+  private EntityRecognition entityRecognition;
+  /** Object Type for StructuredData **/
+  private String objectType;
+  /** the maximum file size (in MB) that can be parsed for EntityRecognition **/
+  private int maxFileSizeMBToParse = 10;
+
+
+    public FsRepository() {
     // We only support Windows.
     if (System.getProperty("os.name").startsWith("Windows")) {
       delegate = new WindowsFileDelegate();
@@ -377,19 +393,19 @@ public class FsRepository implements Repository {
     String identitySource = Configuration.getString(IDENTITY_SOURCE_ID, "").get();
     if (identitySource.isEmpty()) {
       throw new InvalidConfigurationException("The configuration value "
-          + IDENTITY_SOURCE_ID + " is empty. Please specify a valid identity source.");
+              + IDENTITY_SOURCE_ID + " is empty. Please specify a valid identity source.");
     }
 
     String sources = Configuration.getString(CONFIG_SRC, "").get();
     if (sources.isEmpty()) {
       throw new InvalidConfigurationException("The configuration value "
-          + CONFIG_SRC + " is empty. Please specify a valid root path.");
+              + CONFIG_SRC + " is empty. Please specify a valid root path.");
     }
     try {
       startPaths = getStartPaths(sources, Configuration.getString(CONFIG_SRC_SEPARATOR, ";").get());
     } catch (InvalidPathException e) {
       throw new InvalidConfigurationException(CONFIG_SRC
-          + " contains an invalid start path. " + e.getMessage());
+              + " contains an invalid start path. " + e.getMessage());
     } catch (IOException e) {
       throw new InvalidConfigurationException("Exception during resolving start paths", e);
     }
@@ -398,9 +414,9 @@ public class FsRepository implements Repository {
     log.log(Level.CONFIG, "builtinPrefix: {0}", builtinPrefix);
 
     List<String> accountsStr =
-        Configuration.getMultiValue(
-                CONFIG_SUPPORTED_ACCOUNTS, DEFAULT_SUPPORTED_ACCOUNTS, Configuration.STRING_PARSER)
-            .get();
+            Configuration.getMultiValue(
+                    CONFIG_SUPPORTED_ACCOUNTS, DEFAULT_SUPPORTED_ACCOUNTS, Configuration.STRING_PARSER)
+                    .get();
     supportedWindowsAccounts = ImmutableSet.copyOf(accountsStr);
     log.log(Level.CONFIG, "supportedWindowsAccounts: {0}", supportedWindowsAccounts);
 
@@ -415,26 +431,26 @@ public class FsRepository implements Repository {
 
     try {
       preserveLastAccessTime =
-          Enum.valueOf(
-              PreserveLastAccessTime.class,
-              Configuration.getString(
-                      CONFIG_PRESERVE_LAST_ACCESS_TIME, PreserveLastAccessTime.ALWAYS.toString())
-                  .get());
+              Enum.valueOf(
+                      PreserveLastAccessTime.class,
+                      Configuration.getString(
+                              CONFIG_PRESERVE_LAST_ACCESS_TIME, PreserveLastAccessTime.ALWAYS.toString())
+                              .get());
     } catch (IllegalArgumentException e) {
       throw new InvalidConfigurationException("The value of "
-          + CONFIG_PRESERVE_LAST_ACCESS_TIME + " must be one of "
-          + EnumSet.allOf(PreserveLastAccessTime.class) + ".", e);
+              + CONFIG_PRESERVE_LAST_ACCESS_TIME + " must be one of "
+              + EnumSet.allOf(PreserveLastAccessTime.class) + ".", e);
     }
     log.log(Level.CONFIG, "preserveLastAccessTime: {0}",
-        preserveLastAccessTime);
+            preserveLastAccessTime);
 
     int directoryCacheSize = Configuration.getInteger(CONFIG_DIRECTORY_CACHE_SIZE, 50000).get();
     log.log(Level.CONFIG, "directoryCacheSize: {0}", directoryCacheSize);
     isVisibleCache = CacheBuilder.newBuilder()
-        .initialCapacity(directoryCacheSize / 4)
-        .maximumSize(directoryCacheSize)
-        .expireAfterWrite(4, TimeUnit.HOURS) // Notice if someone hides a dir.
-        .build();
+            .initialCapacity(directoryCacheSize / 4)
+            .maximumSize(directoryCacheSize)
+            .expireAfterWrite(4, TimeUnit.HOURS) // Notice if someone hides a dir.
+            .build();
 
     if (context.getDefaultAclMode() == DefaultAclMode.FALLBACK) {
       log.log(Level.WARNING, "The default ACL in FALLBACK mode will be ignored.");
@@ -447,7 +463,7 @@ public class FsRepository implements Repository {
     // Add filters that may exclude older content.
     lastAccessTimeFilter = getFileTimeFilter(CONFIG_LAST_ACCESSED_DAYS, CONFIG_LAST_ACCESSED_DATE);
     lastModifiedTimeFilter =
-        getFileTimeFilter(CONFIG_LAST_MODIFIED_DAYS, CONFIG_LAST_MODIFIED_DATE);
+            getFileTimeFilter(CONFIG_LAST_MODIFIED_DAYS, CONFIG_LAST_MODIFIED_DATE);
 
     monitorForUpdates = Configuration.getBoolean(CONFIG_MONITOR_UPDATES, Boolean.TRUE).get();
     log.log(Level.CONFIG, "monitorForUpdates: {0}", monitorForUpdates);
@@ -470,6 +486,24 @@ public class FsRepository implements Repository {
     }
     if (validStartPaths == 0) {
       throw new StartupException("All start paths failed validation.");
+    }
+
+    // Initialize EntityRecognition
+    objectType = Configuration.getString(IndexingItemBuilder.OBJECT_TYPE, "").get();
+    if(StringUtils.isNotBlank(objectType)) {
+      String entityFolderPath = Configuration.getString(ENTITY_RECOGNITION_FOLDER, "").get();
+      if (StringUtils.isNotBlank(entityFolderPath)) {
+        try {
+          entityRecognition = new EntityRecognition(Paths.get(entityFolderPath));
+            try {
+                maxFileSizeMBToParse = Integer.parseInt(Configuration.getString("maxFileSizeMBToParse", "10").get());
+            } catch (NumberFormatException e) {
+                log.log(Level.WARNING, "maxFileSizeMBToParse must be an int", e);
+            }
+        } catch (IOException e) {
+          log.log(Level.WARNING, "Unable to initialize EntityRecognition", e);
+        }
+      }
     }
   }
 
@@ -1139,6 +1173,29 @@ public class FsRepository implements Repository {
     String mimeType = getDocMimeType(doc);
     item.getMetadata().setMimeType(mimeType);
     item.setItemType(ItemType.CONTENT_ITEM.name());
+
+    if(entityRecognition != null) {
+      File docFile = doc.toFile();
+      if(docFile.length() <= maxFileSizeMBToParse * 1024 * 1024) {
+          item.getMetadata().setObjectType(objectType);
+          FileInputStream fileInputStream = new FileInputStream(docFile);
+          try {
+              TikaUtils.TikaResult tikaResult = TikaUtils.parse(fileInputStream);
+              Multimap<String, Object> multimap = entityRecognition.findEntities(tikaResult.getContent());
+              log.log(Level.FINEST, "Found entities for file (" + doc.toString() + ") : " + multimap);
+              ItemStructuredData itemStructuredData =
+                      new ItemStructuredData().setObject(StructuredData.getStructuredData(objectType, multimap));
+              item.setStructuredData(itemStructuredData);
+          } catch (TikaException | SAXException e) {
+              log.log(Level.WARNING, "Error processing EntityRecognition", e);
+          } finally {
+              fileInputStream.close();
+          }
+      } else {
+          log.log(Level.INFO, "Skipping EntityRecognition because file exceeds max size (" + maxFileSizeMBToParse + " MB) : " + doc.toString());
+      }
+    }
+
 
     operationBuilder.setContent(new FileContent(mimeType, doc.toFile()), ContentFormat.RAW);
     setLastAccessTime(doc, lastAccessTime);
