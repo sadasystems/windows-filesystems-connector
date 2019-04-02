@@ -29,10 +29,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
+import com.google.common.collect.*;
 import com.google.enterprise.cloudsearch.sdk.CheckpointCloseableIterable;
 import com.google.enterprise.cloudsearch.sdk.CheckpointCloseableIterableImpl;
 import com.google.enterprise.cloudsearch.sdk.InvalidConfigurationException;
@@ -260,6 +257,7 @@ public class FsRepository implements Repository {
 
   private static final String ENTITY_RECOGNITION_FOLDER = "entityRecognitionFolder";
   private static final String MAX_FILE_SIZE_MB_TO_PARSE = "maxFileSizeMBToParse";
+  private static final String EXTRA_STRUCTURED_DATA = "extraStructuredData";
 
 
   /* mime type mapping */
@@ -353,6 +351,8 @@ public class FsRepository implements Repository {
   private String objectType;
   /** the maximum file size (in MB) that can be parsed for EntityRecognition **/
   private int maxFileSizeMBToParse = 10;
+  /** extra structured data to add to all items **/
+  private Multimap<String,Object> extraStructuredData;
 
 
     public FsRepository() {
@@ -505,6 +505,20 @@ public class FsRepository implements Repository {
         }
       }
     }
+    // Initialize extra structured data to add to items
+    String sExtraStructuredData = Configuration.getString(EXTRA_STRUCTURED_DATA, "").get();
+    extraStructuredData = LinkedHashMultimap.create();
+    List<String> metadataPairs = Lists.newArrayList(
+            Splitter
+              .on(',')
+              .omitEmptyStrings()
+              .trimResults()
+              .split(sExtraStructuredData));
+
+    for(String pair : metadataPairs) {
+      extraStructuredData.put(StringUtils.substringBefore(pair, "="), StringUtils.substringAfter(pair, "="));
+    }
+
   }
 
   /** Parses the collection of startPaths from the supplied sources. */
@@ -1169,33 +1183,45 @@ public class FsRepository implements Repository {
 
   /* Adds the file's content to the response. */
   private void getFileContent(Path doc, FileTime lastAccessTime, Item item,
-      RepositoryDoc.Builder operationBuilder) throws IOException {
+                              RepositoryDoc.Builder operationBuilder) throws IOException {
     String mimeType = getDocMimeType(doc);
     item.getMetadata().setMimeType(mimeType);
     item.setItemType(ItemType.CONTENT_ITEM.name());
 
-    if(entityRecognition != null) {
+    Multimap<String, Object> multimap = LinkedHashMultimap.create();
+
+    if (extraStructuredData.size() > 0) {
+      multimap.putAll(extraStructuredData);
+      log.log(Level.FINEST, "Adding extra structured data (" + doc.toString() + ") : " + extraStructuredData);
+    }
+
+    if (entityRecognition != null) {
       File docFile = doc.toFile();
-      if(docFile.length() <= maxFileSizeMBToParse * 1024 * 1024) {
-          item.getMetadata().setObjectType(objectType);
-          FileInputStream fileInputStream = new FileInputStream(docFile);
-          try {
-              TikaUtils.TikaResult tikaResult = TikaUtils.parse(fileInputStream);
-              Multimap<String, Object> multimap = entityRecognition.findEntities(tikaResult.getContent());
-              log.log(Level.FINEST, "Found entities for file (" + doc.toString() + ") : " + multimap);
-              ItemStructuredData itemStructuredData =
-                      new ItemStructuredData().setObject(StructuredData.getStructuredData(objectType, multimap));
-              item.setStructuredData(itemStructuredData);
-          } catch (TikaException | SAXException e) {
-              log.log(Level.WARNING, "Error processing EntityRecognition", e);
-          } finally {
-              fileInputStream.close();
-          }
+      if (docFile.length() <= maxFileSizeMBToParse * 1024 * 1024) {
+        FileInputStream fileInputStream = new FileInputStream(docFile);
+        try {
+          TikaUtils.TikaResult tikaResult = TikaUtils.parse(fileInputStream);
+          Multimap<String, Object> entities = entityRecognition.findEntities(tikaResult.getContent());
+          log.log(Level.FINEST, "Found entities for file (" + doc.toString() + ") : " + entities);
+          multimap.putAll(entities);
+        } catch (TikaException | SAXException e) {
+          log.log(Level.WARNING, "Error processing EntityRecognition", e);
+        } finally {
+          fileInputStream.close();
+        }
       } else {
-          log.log(Level.INFO, "Skipping EntityRecognition because file exceeds max size (" + maxFileSizeMBToParse + " MB) : " + doc.toString());
+        log.log(Level.INFO, "Skipping EntityRecognition because file exceeds max size (" + maxFileSizeMBToParse + " MB) : " + doc.toString());
       }
     }
 
+    if (StringUtils.isNotBlank(objectType)) {
+      item.getMetadata().setObjectType(objectType);
+      if(multimap.size() > 0) {
+        ItemStructuredData itemStructuredData =
+                new ItemStructuredData().setObject(StructuredData.getStructuredData(objectType, multimap));
+        item.setStructuredData(itemStructuredData);
+      }
+    }
 
     operationBuilder.setContent(new FileContent(mimeType, doc.toFile()), ContentFormat.RAW);
     setLastAccessTime(doc, lastAccessTime);
