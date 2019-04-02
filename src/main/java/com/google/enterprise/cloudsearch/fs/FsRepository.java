@@ -516,7 +516,7 @@ public class FsRepository implements Repository {
               .split(sExtraStructuredData));
 
     for(String pair : metadataPairs) {
-      extraStructuredData.put(StringUtils.substringBefore(pair, "="), StringUtils.substringAfter(pair, "="));
+      extraStructuredData.put(StringUtils.substringBefore(pair, "|"), StringUtils.substringAfter(pair, "|"));
     }
 
   }
