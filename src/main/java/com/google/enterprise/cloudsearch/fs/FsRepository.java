@@ -53,6 +53,7 @@ import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryContext
 import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryDoc;
 import com.sadasystems.gcs.utils.EntityRecognition;
 import com.sadasystems.gcs.utils.TikaUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.tika.exception.TikaException;
 import org.xml.sax.SAXException;
@@ -1200,8 +1201,14 @@ public class FsRepository implements Repository {
       if (docFile.length() <= maxFileSizeMBToParse * 1024 * 1024) {
         FileInputStream fileInputStream = new FileInputStream(docFile);
         try {
-          TikaUtils.TikaResult tikaResult = TikaUtils.parse(fileInputStream);
-          Multimap<String, Object> entities = entityRecognition.findEntities(tikaResult.getContent());
+          Multimap<String, Object> entities;
+          if (StringUtils.equals(mimeType, "text/plain")) {
+            String content = IOUtils.toString(fileInputStream, "UTF-8");
+            entities = entityRecognition.findEntities(content);
+          } else {
+            TikaUtils.TikaResult tikaResult = TikaUtils.parse(fileInputStream);
+            entities = entityRecognition.findEntities(tikaResult.getContent());
+          }
           log.log(Level.FINEST, "Found entities for file (" + doc.toString() + ") : " + entities);
           multimap.putAll(entities);
         } catch (TikaException | SAXException e) {
@@ -1216,7 +1223,7 @@ public class FsRepository implements Repository {
 
     if (StringUtils.isNotBlank(objectType)) {
       item.getMetadata().setObjectType(objectType);
-      if(multimap.size() > 0) {
+      if (multimap.size() > 0) {
         ItemStructuredData itemStructuredData =
                 new ItemStructuredData().setObject(StructuredData.getStructuredData(objectType, multimap));
         item.setStructuredData(itemStructuredData);
