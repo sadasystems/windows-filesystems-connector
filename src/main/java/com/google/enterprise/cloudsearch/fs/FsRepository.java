@@ -58,6 +58,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.tika.exception.TikaException;
 import org.xml.sax.SAXException;
 
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.DirectoryStream;
@@ -501,7 +502,7 @@ public class FsRepository implements Repository {
             } catch (NumberFormatException e) {
                 log.log(Level.WARNING, "maxFileSizeMBToParse must be an int", e);
             }
-        } catch (IOException e) {
+        } catch (IOException|SAXException|ParserConfigurationException e) {
           log.log(Level.WARNING, "Unable to initialize EntityRecognition", e);
         }
       }
@@ -1204,10 +1205,10 @@ public class FsRepository implements Repository {
           Multimap<String, Object> entities;
           if (StringUtils.equals(mimeType, "text/plain")) {
             String content = IOUtils.toString(fileInputStream, "UTF-8");
-            entities = entityRecognition.findEntities(content);
+            entities = entityRecognition.findEntities(content, item.getMetadata().getSourceRepositoryUrl());
           } else {
             TikaUtils.TikaResult tikaResult = TikaUtils.parse(fileInputStream);
-            entities = entityRecognition.findEntities(tikaResult.getContent());
+            entities = entityRecognition.findEntities(tikaResult.getContent(), item.getMetadata().getSourceRepositoryUrl());
           }
           log.log(Level.FINEST, "Found entities for file (" + doc.toString() + ") : " + entities);
           multimap.putAll(entities);
