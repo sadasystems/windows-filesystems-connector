@@ -259,6 +259,7 @@ public class FsRepository implements Repository {
 
   private static final String ENTITY_RECOGNITION_FOLDER = "entityRecognitionFolder";
   private static final String MAX_FILE_SIZE_MB_TO_PARSE = "maxFileSizeMBToParse";
+  private static final String MAX_FILE_SIZE_MB_TO_TRANSMIT = "maxFileSizeMBToTransmit";
   private static final String EXTRA_STRUCTURED_DATA = "extraStructuredData";
 
 
@@ -351,8 +352,10 @@ public class FsRepository implements Repository {
   private EntityRecognition entityRecognition;
   /** Object Type for StructuredData **/
   private String objectType;
-  /** the maximum file size (in MB) that can be parsed for EntityRecognition **/
-  private int maxFileSizeMBToParse = 10;
+  /** the maximum file size (in bytes) that can be parsed for EntityRecognition **/
+  private int maxFileSizeBytesToParse = 10*1024*1024;
+  /** the maximum file size (in bytes) to transmit - if larger, only the metadata will be indexed **/
+  private int maxFileSizeBytesToTransmit = 250*1024*1024;
   /** extra structured data to add to all items **/
   private Multimap<String,Object> extraStructuredData;
 
@@ -497,13 +500,20 @@ public class FsRepository implements Repository {
       if (StringUtils.isNotBlank(entityFolderPath)) {
         try {
           entityRecognition = new EntityRecognition(Paths.get(entityFolderPath));
-            try {
-                maxFileSizeMBToParse = Integer.parseInt(Configuration.getString("maxFileSizeMBToParse", "10").get());
-            } catch (NumberFormatException e) {
-                log.log(Level.WARNING, "maxFileSizeMBToParse must be an int", e);
-            }
-        } catch (IOException|SAXException|ParserConfigurationException e) {
+        } catch (IOException| SAXException | ParserConfigurationException e) {
           log.log(Level.WARNING, "Unable to initialize EntityRecognition", e);
+        }
+        try {
+          int maxFileSizeMBToParse = Integer.parseInt(Configuration.getString(MAX_FILE_SIZE_MB_TO_PARSE, "10").get());
+          maxFileSizeBytesToParse = maxFileSizeMBToParse * 1024 * 1024;
+        } catch (NumberFormatException e) {
+          log.log(Level.WARNING, "maxFileSizeMBToParse must be an int", e);
+        }
+        try {
+          int maxFileSizeMBToTransmit = Integer.parseInt(Configuration.getString(MAX_FILE_SIZE_MB_TO_TRANSMIT, "250").get());
+          maxFileSizeBytesToTransmit = maxFileSizeMBToTransmit * 1024 * 1024;
+        } catch (NumberFormatException e) {
+          log.log(Level.WARNING, "maxFileSizeMBToTransmit must be an int", e);
         }
       }
     }
@@ -1197,9 +1207,10 @@ public class FsRepository implements Repository {
       log.log(Level.FINEST, "Adding extra structured data (" + doc.toString() + ") : " + extraStructuredData);
     }
 
+    File docFile = doc.toFile();
+
     if (entityRecognition != null) {
-      File docFile = doc.toFile();
-      if (docFile.length() <= maxFileSizeMBToParse * 1024 * 1024) {
+      if (docFile.length() <= maxFileSizeBytesToParse) {
         FileInputStream fileInputStream = new FileInputStream(docFile);
         try {
           Multimap<String, Object> entities;
@@ -1218,7 +1229,7 @@ public class FsRepository implements Repository {
           fileInputStream.close();
         }
       } else {
-        log.log(Level.INFO, "Skipping EntityRecognition because file exceeds max size (" + maxFileSizeMBToParse + " MB) : " + doc.toString());
+        log.log(Level.INFO, "Skipping EntityRecognition because file exceeds max size (" + maxFileSizeBytesToParse + " bytes) : " + doc.toString());
       }
     }
 
@@ -1231,7 +1242,14 @@ public class FsRepository implements Repository {
       }
     }
 
-    operationBuilder.setContent(new FileContent(mimeType, doc.toFile()), ContentFormat.RAW);
+    log.log(Level.INFO, "File Size for [" + docFile + "] ::  [" + docFile.length() + "]  bytes");
+    if (docFile.length() > maxFileSizeBytesToTransmit)
+    {
+      log.log(Level.INFO, "Excluding File from Indexing - Size larger than allowed for file [" + docFile + "]");
+    } else {
+      operationBuilder.setContent(new FileContent(mimeType, doc.toFile()), ContentFormat.RAW);
+    }
+
     setLastAccessTime(doc, lastAccessTime);
   }
 
