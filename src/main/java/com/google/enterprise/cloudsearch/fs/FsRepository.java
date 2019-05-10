@@ -1218,12 +1218,12 @@ public class FsRepository implements Repository {
             String content = IOUtils.toString(fileInputStream, "UTF-8");
             entities = entityRecognition.findEntities(content, item.getMetadata().getSourceRepositoryUrl());
           } else {
-            TikaUtils.TikaResult tikaResult = TikaUtils.parse(fileInputStream);
+            TikaUtils.TikaResult tikaResult = TikaUtils.parseAsProcess(docFile);
             entities = entityRecognition.findEntities(tikaResult.getContent(), item.getMetadata().getSourceRepositoryUrl());
           }
           log.log(Level.FINEST, "Found entities for file (" + doc.toString() + ") : " + entities);
           multimap.putAll(entities);
-        } catch (TikaException | SAXException e) {
+        } catch (TikaException | SAXException | InterruptedException e) {
           log.log(Level.WARNING, "Error processing EntityRecognition", e);
         } finally {
           fileInputStream.close();
