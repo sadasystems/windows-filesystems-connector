@@ -1211,12 +1211,13 @@ public class FsRepository implements Repository {
 
     if (entityRecognition != null) {
       if (docFile.length() <= maxFileSizeBytesToParse) {
-        FileInputStream fileInputStream = new FileInputStream(docFile);
         try {
           Multimap<String, Object> entities;
           if (StringUtils.equals(mimeType, "text/plain")) {
-            String content = IOUtils.toString(fileInputStream, "UTF-8");
-            entities = entityRecognition.findEntities(content, item.getMetadata().getSourceRepositoryUrl());
+            try (FileInputStream fileInputStream = new FileInputStream(docFile)) {
+              String content = IOUtils.toString(fileInputStream, "UTF-8");
+              entities = entityRecognition.findEntities(content, item.getMetadata().getSourceRepositoryUrl());
+            }
           } else {
             TikaUtils.TikaResult tikaResult = TikaUtils.parseAsProcess(docFile);
             entities = entityRecognition.findEntities(tikaResult.getContent(), item.getMetadata().getSourceRepositoryUrl());
@@ -1225,8 +1226,6 @@ public class FsRepository implements Repository {
           multimap.putAll(entities);
         } catch (TikaException | SAXException | InterruptedException e) {
           log.log(Level.WARNING, "Error processing EntityRecognition", e);
-        } finally {
-          fileInputStream.close();
         }
       } else {
         log.log(Level.INFO, "Skipping EntityRecognition because file exceeds max size (" + maxFileSizeBytesToParse + " bytes) : " + doc.toString());
