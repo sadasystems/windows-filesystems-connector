@@ -18,6 +18,7 @@ package com.google.enterprise.cloudsearch.fs;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.enterprise.cloudsearch.sdk.indexing.IndexingServiceImpl.IDENTITY_SOURCE_ID;
+import static com.google.enterprise.cloudsearch.sdk.indexing.IndexingServiceImpl.PollItemStatus.ACCEPTED;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Locale.ENGLISH;
 
@@ -53,6 +54,7 @@ import com.google.enterprise.cloudsearch.sdk.indexing.template.PushItems;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.Repository;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryContext;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryDoc;
+import org.apache.commons.codec.binary.StringUtils;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
@@ -800,17 +802,24 @@ public class FsRepository implements Repository {
             new Object[] {doc, attrs.lastModifiedTime().toString().substring(0, 10)});
         return ApiOperations.deleteItem(docName);
       }
+      if(StringUtils.equals(ACCEPTED.toString(), docItem.getStatus().getCode())) {
+        log.log(Level.FINEST, "Not re-indexing item because it is not modified");
+        PushItem notModified = new PushItem().setType("NOT_MODIFIED");
+        return new PushItems.Builder().addPushItem(docItem.getName(), notModified).build();
+      }
     }
 
     Date lastModified = new Date(attrs.lastModifiedTime().toMillis());
     Date created = new Date(attrs.creationTime().toMillis());
+
 
     ItemMetadata metadata =
         new ItemMetadata()
             .setTitle(getTitle(doc))
             .setSourceRepositoryUrl(doc.toUri().toString())
             .setCreateTime(new DateTime(created).toStringRfc3339())
-            .setUpdateTime(new DateTime(lastModified).toStringRfc3339());
+            .setUpdateTime(new DateTime(lastModified).toStringRfc3339())
+            .setHash(String.valueOf(lastModified.getTime()));
     if (parent != null) {
       metadata.setContainerName(parent);
     }
@@ -1072,7 +1081,7 @@ public class FsRepository implements Repository {
           continue;
         }
         if (children++ < largeDirectoryLimit) {
-          operationBuilder.addChildId(docId, new PushItem());
+          operationBuilder.addChildId(docId, new PushItem().setMetadataHash(String.valueOf(file.toFile().lastModified())));
         } else {
           log.log(Level.FINE, "Listing of children for {0} exceeds largeDirectoryLimit of {1}."
               + " Switching to asynchronous feed of child IDs.",
@@ -1109,7 +1118,7 @@ public class FsRepository implements Repository {
             log.log(Level.WARNING, "Not pushing " + path, e);
             continue;
           }
-          builder.addPushItem(docid, new PushItem());
+          builder.addPushItem(docid, new PushItem().setMetadataHash(String.valueOf(path.toFile().lastModified())));
           count++;
           if (count % ASYNC_PUSH_ITEMS_BATCH_SIZE == 0) {
             context.postApiOperationAsync(builder.build());
