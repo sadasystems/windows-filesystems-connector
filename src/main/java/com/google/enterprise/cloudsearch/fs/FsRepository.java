@@ -54,7 +54,6 @@ import com.google.enterprise.cloudsearch.sdk.indexing.template.PushItems;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.Repository;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryContext;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryDoc;
-import org.apache.commons.codec.binary.StringUtils;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
@@ -802,7 +801,7 @@ public class FsRepository implements Repository {
             new Object[] {doc, attrs.lastModifiedTime().toString().substring(0, 10)});
         return ApiOperations.deleteItem(docName);
       }
-      if(StringUtils.equals(ACCEPTED.toString(), docItem.getStatus().getCode())) {
+      if(ACCEPTED.toString().equals(docItem.getStatus().getCode())) {
         log.log(Level.FINEST, "Not re-indexing item because it is not modified");
         PushItem notModified = new PushItem().setType("NOT_MODIFIED");
         return new PushItems.Builder().addPushItem(docItem.getName(), notModified).build();
