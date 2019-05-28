@@ -39,7 +39,6 @@ import com.google.enterprise.cloudsearch.sdk.indexing.IndexingService.RequestMod
 import com.google.enterprise.cloudsearch.sdk.indexing.StructuredData;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.*;
 import com.sadasystems.gcs.utils.EntityRecognition;
-//import com.sadasystems.gcs.utils.FileExclusionUtil;
 import com.sadasystems.gcs.utils.FilePatternUtils;
 import com.sadasystems.gcs.utils.TikaUtils;
 import org.apache.commons.io.IOUtils;
