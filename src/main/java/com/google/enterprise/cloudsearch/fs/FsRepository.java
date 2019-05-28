@@ -15,27 +15,19 @@
  */
 package com.google.enterprise.cloudsearch.fs;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
-import static com.google.enterprise.cloudsearch.sdk.indexing.IndexingServiceImpl.IDENTITY_SOURCE_ID;
-import static com.google.enterprise.cloudsearch.sdk.indexing.IndexingServiceImpl.PollItemStatus.ACCEPTED;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.Locale.ENGLISH;
-
 import com.google.api.client.http.FileContent;
 import com.google.api.client.util.DateTime;
-import com.google.api.services.cloudsearch.v1.model.*;
+import com.google.api.services.cloudsearch.v1.model.Item;
+import com.google.api.services.cloudsearch.v1.model.ItemMetadata;
+import com.google.api.services.cloudsearch.v1.model.ItemStructuredData;
+import com.google.api.services.cloudsearch.v1.model.PushItem;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.*;
-import com.google.enterprise.cloudsearch.sdk.CheckpointCloseableIterable;
-import com.google.enterprise.cloudsearch.sdk.CheckpointCloseableIterableImpl;
-import com.google.enterprise.cloudsearch.sdk.InvalidConfigurationException;
-import com.google.enterprise.cloudsearch.sdk.RepositoryException;
-import com.google.enterprise.cloudsearch.sdk.StartupException;
+import com.google.enterprise.cloudsearch.sdk.*;
 import com.google.enterprise.cloudsearch.sdk.config.Configuration;
 import com.google.enterprise.cloudsearch.sdk.indexing.Acl;
 import com.google.enterprise.cloudsearch.sdk.indexing.Acl.InheritanceType;
@@ -45,54 +37,32 @@ import com.google.enterprise.cloudsearch.sdk.indexing.IndexingItemBuilder.ItemTy
 import com.google.enterprise.cloudsearch.sdk.indexing.IndexingService.ContentFormat;
 import com.google.enterprise.cloudsearch.sdk.indexing.IndexingService.RequestMode;
 import com.google.enterprise.cloudsearch.sdk.indexing.StructuredData;
-import com.google.enterprise.cloudsearch.sdk.indexing.template.ApiOperation;
-import com.google.enterprise.cloudsearch.sdk.indexing.template.ApiOperations;
-import com.google.enterprise.cloudsearch.sdk.indexing.template.AsyncApiOperation;
-import com.google.enterprise.cloudsearch.sdk.indexing.template.PushItems;
-import com.google.enterprise.cloudsearch.sdk.indexing.template.Repository;
-import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryContext;
-import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryDoc;
+import com.google.enterprise.cloudsearch.sdk.indexing.template.*;
 import com.sadasystems.gcs.utils.EntityRecognition;
 import com.sadasystems.gcs.utils.FileExclusionUtil;
 import com.sadasystems.gcs.utils.TikaUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
-import org.apache.tika.exception.TikaException;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
-import java.nio.file.AccessDeniedException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
-import java.nio.file.NoSuchFileException;
-import java.nio.file.NotDirectoryException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Date;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.enterprise.cloudsearch.sdk.indexing.IndexingServiceImpl.IDENTITY_SOURCE_ID;
+import static com.google.enterprise.cloudsearch.sdk.indexing.IndexingServiceImpl.PollItemStatus.ACCEPTED;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Locale.ENGLISH;
 
 // TODO(b/119498228): Support\Verify that we can handle \\host\C$ shares. Support\Verify
 // that we can handle \\host only shares. Decide what we want to discover within \\host
