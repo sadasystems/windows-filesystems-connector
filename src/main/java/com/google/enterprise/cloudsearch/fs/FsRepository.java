@@ -39,7 +39,8 @@ import com.google.enterprise.cloudsearch.sdk.indexing.IndexingService.RequestMod
 import com.google.enterprise.cloudsearch.sdk.indexing.StructuredData;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.*;
 import com.sadasystems.gcs.utils.EntityRecognition;
-import com.sadasystems.gcs.utils.FileExclusionUtil;
+//import com.sadasystems.gcs.utils.FileExclusionUtil;
+import com.sadasystems.gcs.utils.FilePatternUtils;
 import com.sadasystems.gcs.utils.TikaUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
@@ -234,8 +235,9 @@ public class FsRepository implements Repository {
     private static final String MAX_FILE_SIZE_MB_TO_PARSE = "maxFileSizeMBToParse";
     private static final String MAX_FILE_SIZE_MB_TO_TRANSMIT = "maxFileSizeMBToTransmit";
     private static final String EXTRA_STRUCTURED_DATA = "extraStructuredData";
-    private static final String FILE_EXCLUSION_FOLDER = "fileExclusionFolder";
-    private static final String CONFIG_EXCLUDE_FOLDERS = "fs.excludeFolders";
+    private static final String FILE_EXCLUSION = "fileExclusion";
+    private static final String FILE_INCLUSION = "fileInclusion";
+    //private static final String CONFIG_EXCLUDE_FOLDERS = "fs.excludeFolders";
 
 
     /* mime type mapping */
@@ -297,7 +299,7 @@ public class FsRepository implements Repository {
      * VIRTUAL_CONTAINER_ITEM items.
      */
     private boolean indexFolders;
-    private boolean isExclude;
+    //private boolean isExclude;
 
     /** How to enforce preservation of last access time of files and folders. */
     private enum PreserveLastAccessTime {NEVER, IF_ALLOWED, ALWAYS}
@@ -342,7 +344,8 @@ public class FsRepository implements Repository {
     private int maxFileSizeBytesToTransmit = 250 * 1024 * 1024;
     /** extra structured data to add to all items **/
     private Multimap<String, Object> extraStructuredData;
-    private FileExclusionUtil fileExclusion;
+    //private FileExclusionUtil fileExclusion;
+    private FilePatternUtils filePatterns;
 
     public FsRepository() {
         // We only support Windows.
@@ -418,8 +421,8 @@ public class FsRepository implements Repository {
         indexFolders = Configuration.getBoolean(CONFIG_INDEX_FOLDERS, Boolean.TRUE).get();
         log.log(Level.CONFIG, "indexFolders: {0}", indexFolders);
 
-        isExclude = Configuration.getBoolean(CONFIG_EXCLUDE_FOLDERS, Boolean.TRUE).get();
-        log.log(Level.CONFIG, "excludeFolders: {0}", isExclude);
+        //isExclude = Configuration.getBoolean(CONFIG_EXCLUDE_FOLDERS, Boolean.TRUE).get();
+        //log.log(Level.CONFIG, "excludeFolders: {0}", isExclude);
 
         try {
             preserveLastAccessTime =
@@ -521,14 +524,36 @@ public class FsRepository implements Repository {
 
         //Changes for file exclusion
 
-        String fileExclusionFolderPath = Configuration.getString(FILE_EXCLUSION_FOLDER, "").get();
+        /*String fileExclusionFolderPath = Configuration.getString(FILE_EXCLUSION_FOLDER, "").get();
         if (StringUtils.isNotBlank(fileExclusionFolderPath)) {
             try {
                 fileExclusion = new FileExclusionUtil(Paths.get(fileExclusionFolderPath));
             } catch (IOException | SAXException | ParserConfigurationException e) {
                 log.log(Level.WARNING, "Unable to initialize FileExcusions", e);
             }
-        }
+        }*/
+
+        String fileExclusions = Configuration.getString(FILE_EXCLUSION, "").get();
+        String fileInclusions = Configuration.getString(FILE_INCLUSION, "").get();
+
+            try {
+                File fExclude = null;
+                File fInclude = null;
+                if (StringUtils.isNotBlank(fileExclusions))
+                {
+                   fExclude = new File(fileExclusions);
+                }
+
+                if (StringUtils.isNotBlank(fileExclusions))
+                {
+                    fInclude = new File(fileInclusions);
+                }
+
+                filePatterns = new FilePatternUtils(fInclude, fExclude);
+            } catch (Exception  e) {
+                log.log(Level.WARNING, "Unable to initialize FilePatterns", e);
+            }
+
     }
 
     /** Parses the collection of startPaths from the supplied sources. */
@@ -787,7 +812,7 @@ public class FsRepository implements Repository {
             return ApiOperations.deleteItem(docName);
         } */
 
-        if (isExclude) {
+       /* if (isExclude) {
             log.log(Level.INFO, "Checking for Exclusion  ::[" + docName + "]");
             if (fileExclusion.IsExcluded(docName))
             {
@@ -805,8 +830,13 @@ public class FsRepository implements Repository {
                 return ApiOperations.deleteItem(docName);
             }
 
-        }
+        }*/
+if (!filePatterns.isInclude(docName))
+{
+    log.log(Level.INFO, "File Excluded from Index for  ::[" + docName + "]");
 
+    return ApiOperations.deleteItem(docName);
+}
             log.log(Level.INFO, "File Included for  Indexing for  ::[" + docName + "]");
 
 
