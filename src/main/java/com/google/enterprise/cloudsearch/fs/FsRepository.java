@@ -74,15 +74,15 @@ import static java.util.Locale.ENGLISH;
  * <p>Features:<br>
  *
  * <ul>
- *   <li>Supports UNC path to single machine's share, such as \\host\share
- *   <li>Supports UNC path to standalone or domain-based DFS namespace, such as
- *       \\dfs-server\namespace or \\domain-dfs-server\namespace and will follow all the DFS links
- *       within that namespace
- *   <li>Supports UNC path to standalone or domain-based DFS link, such as
- *       \\dfs-server\namespace\link or \\domain-dfs-server\namespace\link
- *   <li>Supports multiple UNC paths to any combination of simple file shares, DFS namespaces, or
- *       DFS links
- *   <li>Uses hierarchical ACL model
+ * <li>Supports UNC path to single machine's share, such as \\host\share
+ * <li>Supports UNC path to standalone or domain-based DFS namespace, such as
+ * \\dfs-server\namespace or \\domain-dfs-server\namespace and will follow all the DFS links
+ * within that namespace
+ * <li>Supports UNC path to standalone or domain-based DFS link, such as
+ * \\dfs-server\namespace\link or \\domain-dfs-server\namespace\link
+ * <li>Supports multiple UNC paths to any combination of simple file shares, DFS namespaces, or
+ * DFS links
+ * <li>Uses hierarchical ACL model
  * </ul>
  *
  * <p>This repository attempts to replicate the Windows file system ACL inheritance model
@@ -95,33 +95,33 @@ import static java.util.Locale.ENGLISH;
  * <p>Windows permission inheritance has many nuances:
  *
  * <ul>
- *   <li>Generally, files and folders inherit permissions from their parent folder.
- *   <li>Files and folders may also have explicit permissions that enhance or reduce permissions
- *       inherited from their parent.
- *   <li>A file or folder can be configured to not inherit any permissions from its parent.
- *   <li>A folder can have permissions that apply only to itself and child folders.
- *   <li>A folder can have permissions that apply only to child files.
- *   <li>A folder can have permissions that do not apply to itself, but do apply to its children.
- *   <li>A folder can have permissions that apply to itself, but do not apply to any of its
- *       children.
- *   <li>A folder can have permissions that apply only to its direct children, but none of their
- *       descendants.
+ * <li>Generally, files and folders inherit permissions from their parent folder.
+ * <li>Files and folders may also have explicit permissions that enhance or reduce permissions
+ * inherited from their parent.
+ * <li>A file or folder can be configured to not inherit any permissions from its parent.
+ * <li>A folder can have permissions that apply only to itself and child folders.
+ * <li>A folder can have permissions that apply only to child files.
+ * <li>A folder can have permissions that do not apply to itself, but do apply to its children.
+ * <li>A folder can have permissions that apply to itself, but do not apply to any of its
+ * children.
+ * <li>A folder can have permissions that apply only to its direct children, but none of their
+ * descendants.
  * </ul>
- *
+ * <p>
  * For more details, see {@link AclBuilder}.
  *
  * <p>To model these various behaviors, folders typically supply four separate ACLs as named
  * resources used for inheritance purposes:
  *
  * <ul>
- *   <li>{@code ALL_FOLDER_INHERIT_ACL}: Permissions inheritable by all descendent folders.
- *   <li>{@code ALL_FILE_INHERIT_ACL}: Permissions inheritable by all descendent regular files.
- *   <li>{@code CHILD_FOLDER_INHERIT_ACL}: Permissions inheritable only by direct child folders, but
- *       no other descendent folders.
- *   <li>{@code CHILD_FILE_INHERIT_ACL}: Permissions inheritable only by direct child files, but no
- *       other descendent regular files.
+ * <li>{@code ALL_FOLDER_INHERIT_ACL}: Permissions inheritable by all descendent folders.
+ * <li>{@code ALL_FILE_INHERIT_ACL}: Permissions inheritable by all descendent regular files.
+ * <li>{@code CHILD_FOLDER_INHERIT_ACL}: Permissions inheritable only by direct child folders, but
+ * no other descendent folders.
+ * <li>{@code CHILD_FILE_INHERIT_ACL}: Permissions inheritable only by direct child files, but no
+ * other descendent regular files.
  * </ul>
- *
+ * <p>
  * Folders and regular files also supply their own specific ACL, which contains any explicit
  * permissions set on that item. Usually, this ACL is empty and simply inherits from one of its
  * parent's four inheritable ACLs.
@@ -164,7 +164,9 @@ import static java.util.Locale.ENGLISH;
 public class FsRepository implements Repository {
     private static final Logger log = Logger.getLogger(FsRepository.class.getName());
 
-    /** The config parameter name for the start paths. */
+    /**
+     * The config parameter name for the start paths.
+     */
     private static final String CONFIG_SRC = "fs.src";
 
     /**
@@ -173,22 +175,34 @@ public class FsRepository implements Repository {
      */
     private static final String CONFIG_SRC_SEPARATOR = "fs.src.separator";
 
-    /** The config parameter name for the supported Windows accounts. */
+    /**
+     * The config parameter name for the supported Windows accounts.
+     */
     private static final String CONFIG_SUPPORTED_ACCOUNTS = "fs.supportedAccounts";
 
-    /** The config parameter name for the supported Windows domain. */
+    /**
+     * The config parameter name for the supported Windows domain.
+     */
     private static final String CONFIG_SUPPORTED_DOMAIN = "fs.supportedDomain";
 
-    /** The config parameter name for turning on/off hidden file indexing. */
+    /**
+     * The config parameter name for turning on/off hidden file indexing.
+     */
     private static final String CONFIG_CRAWL_HIDDEN_FILES = "fs.crawlHiddenFiles";
 
-    /** The config parameter name for turning on/off folder indexing. */
+    /**
+     * The config parameter name for turning on/off folder indexing.
+     */
     private static final String CONFIG_INDEX_FOLDERS = "fs.indexFolders";
 
-    /** The config parameter name for strategy of preserving last access time. */
+    /**
+     * The config parameter name for strategy of preserving last access time.
+     */
     private static final String CONFIG_PRESERVE_LAST_ACCESS_TIME = "fs.preserveLastAccessTime";
 
-    /** The config parameter name for the size of the isVisible directory cache. */
+    /**
+     * The config parameter name for the size of the isVisible directory cache.
+     */
     private static final String CONFIG_DIRECTORY_CACHE_SIZE = "fs.directoryCacheSize";
 
     /**
@@ -215,19 +229,29 @@ public class FsRepository implements Repository {
      */
     private static final String CONFIG_LAST_MODIFIED_DATE = "fs.lastModifiedDate";
 
-    /** The config parameter name to enable/disable filesystem change monitors. */
+    /**
+     * The config parameter name to enable/disable filesystem change monitors.
+     */
     private static final String CONFIG_MONITOR_UPDATES = "fs.monitorForUpdates";
 
-    /** The config parameter name to force the connector to ignore the share ACL. */
+    /**
+     * The config parameter name to force the connector to ignore the share ACL.
+     */
     private static final String CONFIG_SKIP_SHARE_ACL = "fs.skipShareAccessControl";
 
-    /** The config parameter name for the prefix for BUILTIN groups. */
+    /**
+     * The config parameter name for the prefix for BUILTIN groups.
+     */
     private static final String CONFIG_BUILTIN_PREFIX = "fs.builtinGroupPrefix";
 
-    /** The config parameter name for the directory size that triggers async processing. */
+    /**
+     * The config parameter name for the directory size that triggers async processing.
+     */
     private static final String CONFIG_LARGE_DIRECTORY_LIMIT = "fs.largeDirectoryLimit";
 
-    /** Properties filename to specify mime types. */
+    /**
+     * Properties filename to specify mime types.
+     */
     private static final String MIME_TYPE_PROP_FILENAME = "mime-type.properties";
 
     private static final String ENTITY_RECOGNITION_FOLDER = "entityRecognitionFolder";
@@ -242,7 +266,9 @@ public class FsRepository implements Repository {
     /* mime type mapping */
     private static final Properties mimeTypeProperties = getMimeTypes();
 
-    /** Fragments used for creating the inherited ACL named resources. */
+    /**
+     * Fragments used for creating the inherited ACL named resources.
+     */
     @VisibleForTesting
     static final String ALL_FOLDER_INHERIT_ACL = "allFoldersAcl";
     @VisibleForTesting
@@ -252,11 +278,15 @@ public class FsRepository implements Repository {
     @VisibleForTesting
     static final String CHILD_FILE_INHERIT_ACL = "childFilesAcl";
 
-    /** Fragment used for creating the DFS share ACL named resource. */
+    /**
+     * Fragment used for creating the DFS share ACL named resource.
+     */
     @VisibleForTesting
     static final String DFS_SHARE_ACL = "dfsShareAcl";
 
-    /** Fragment used for creating the share ACL named resource. */
+    /**
+     * Fragment used for creating the share ACL named resource.
+     */
     @VisibleForTesting
     static final String SHARE_ACL = "shareAcl";
 
@@ -269,7 +299,9 @@ public class FsRepository implements Repository {
                     "NT AUTHORITY\\INTERACTIVE",
                     "NT AUTHORITY\\Authenticated Users");
 
-    /** The number of items in a batch, when pushing directory contents asynchronously. */
+    /**
+     * The number of items in a batch, when pushing directory contents asynchronously.
+     */
     @VisibleForTesting
     static final int ASYNC_PUSH_ITEMS_BATCH_SIZE = 100;
 
@@ -290,7 +322,9 @@ public class FsRepository implements Repository {
      */
     private String builtinPrefix;
 
-    /** If true, crawl hidden files and folders.  Default is false. */
+    /**
+     * If true, crawl hidden files and folders.  Default is false.
+     */
     private boolean crawlHiddenFiles;
 
     /**
@@ -300,12 +334,16 @@ public class FsRepository implements Repository {
     private boolean indexFolders;
     //private boolean isExclude;
 
-    /** How to enforce preservation of last access time of files and folders. */
+    /**
+     * How to enforce preservation of last access time of files and folders.
+     */
     private enum PreserveLastAccessTime {NEVER, IF_ALLOWED, ALWAYS}
 
     private PreserveLastAccessTime preserveLastAccessTime;
 
-    /** Cache of hidden and visible directories. */
+    /**
+     * Cache of hidden and visible directories.
+     */
     private Cache<Path, Hidden> isVisibleCache;
 
     private FileDelegate delegate;
@@ -313,35 +351,57 @@ public class FsRepository implements Repository {
     private boolean skipShareAcl;
     private boolean monitorForUpdates;
 
-    /** The set of file systems we will be traversing. */
+    /**
+     * The set of file systems we will be traversing.
+     */
     private Set<Path> startPaths;
 
-    /** The namespace links discovered during init. */
+    /**
+     * The namespace links discovered during init.
+     */
     private Map<Path, Set<Path>> dfsNamespaceLinks = new HashMap<>();
 
-    /** The set of file systems currently blocked from traversing. */
+    /**
+     * The set of file systems currently blocked from traversing.
+     */
     private Set<Path> blockedPaths = Sets.newConcurrentHashSet();
 
-    /** Filter that may exclude files whose last modified time is too old. */
+    /**
+     * Filter that may exclude files whose last modified time is too old.
+     */
     private FileTimeFilter lastModifiedTimeFilter;
 
-    /** Filter that may exclude files whose last access time is too old. */
+    /**
+     * Filter that may exclude files whose last access time is too old.
+     */
     private FileTimeFilter lastAccessTimeFilter;
 
     private int largeDirectoryLimit;
 
-    /** ExecutorService for asychronous pushing of large directory content. */
+    /**
+     * ExecutorService for asychronous pushing of large directory content.
+     */
     private ExecutorService asyncDirectoryPusherService;
 
-    /** Look for entities within content of files **/
+    /**
+     * Look for entities within content of files
+     **/
     private EntityRecognition entityRecognition;
-    /** Object Type for StructuredData **/
+    /**
+     * Object Type for StructuredData
+     **/
     private String objectType;
-    /** the maximum file size (in bytes) that can be parsed for EntityRecognition **/
+    /**
+     * the maximum file size (in bytes) that can be parsed for EntityRecognition
+     **/
     private int maxFileSizeBytesToParse = 10 * 1024 * 1024;
-    /** the maximum file size (in bytes) to transmit - if larger, only the metadata will be indexed **/
+    /**
+     * the maximum file size (in bytes) to transmit - if larger, only the metadata will be indexed
+     **/
     private int maxFileSizeBytesToTransmit = 250 * 1024 * 1024;
-    /** extra structured data to add to all items **/
+    /**
+     * extra structured data to add to all items
+     **/
     private Multimap<String, Object> extraStructuredData;
     //private FileExclusionUtil fileExclusion;
     private FilePatternUtils filePatterns;
@@ -535,27 +595,27 @@ public class FsRepository implements Repository {
         String fileExclusions = Configuration.getString(FILE_EXCLUSION, "").get();
         String fileInclusions = Configuration.getString(FILE_INCLUSION, "").get();
 
-            try {
-                File fExclude = null;
-                File fInclude = null;
-                if (StringUtils.isNotBlank(fileExclusions))
-                {
-                   fExclude = new File(fileExclusions);
-                }
-
-                if (StringUtils.isNotBlank(fileExclusions))
-                {
-                    fInclude = new File(fileInclusions);
-                }
-
-                filePatterns = new FilePatternUtils(fInclude, fExclude);
-            } catch (Exception  e) {
-                log.log(Level.WARNING, "Unable to initialize FilePatterns", e);
+        try {
+            File fExclude = null;
+            File fInclude = null;
+            if (StringUtils.isNotBlank(fileExclusions)) {
+                fExclude = new File(fileExclusions);
             }
+
+            if (StringUtils.isNotBlank(fileExclusions)) {
+                fInclude = new File(fileInclusions);
+            }
+
+            filePatterns = new FilePatternUtils(fInclude, fExclude);
+        } catch (Exception e) {
+            log.log(Level.WARNING, "Unable to initialize FilePatterns", e);
+        }
 
     }
 
-    /** Parses the collection of startPaths from the supplied sources. */
+    /**
+     * Parses the collection of startPaths from the supplied sources.
+     */
     @VisibleForTesting
     Set<Path> getStartPaths(String sources, String separator)
             throws IOException, InvalidPathException {
@@ -574,7 +634,9 @@ public class FsRepository implements Repository {
         return builder.build();
     }
 
-    /** Verify that a startPath is valid. */
+    /**
+     * Verify that a startPath is valid.
+     */
     @VisibleForTesting
     void validateStartPath(Path startPath, boolean logging)
             throws IOException, InvalidConfigurationException {
@@ -629,7 +691,9 @@ public class FsRepository implements Repository {
         }
     }
 
-    /** Returns the DFS Link or Namespace for a path; or null if not DFS. */
+    /**
+     * Returns the DFS Link or Namespace for a path; or null if not DFS.
+     */
     private Path getDfsRoot(Path path) throws IOException {
         for (Path file = path; file != null; file = getParent(file)) {
             if (delegate.isDfsNamespace(file) || delegate.isDfsLink(file)) {
@@ -639,7 +703,9 @@ public class FsRepository implements Repository {
         return null;
     }
 
-    /** Verify the path is available and we have access to it. */
+    /**
+     * Verify the path is available and we have access to it.
+     */
     @VisibleForTesting
     void validateShare(Path sharePath) throws IOException {
         if (delegate.isDfsNamespace(sharePath)) {
@@ -802,41 +868,13 @@ public class FsRepository implements Repository {
         final String docName = docItem.getName(); // DocId
         final Path doc;
 
-        //SADA Changes for exclude
 
-        //.log.log(Level.INFO, "Checking for exclude for ::[" + docName + "]");
-        /*if (fileExclusion.IsExcluded(docName)) {
-            log.log(Level.INFO, "File Removed from Index for  ::[" + docName + "]");
+        if (!filePatterns.isInclude(docName)) {
+            log.log(Level.INFO, "File Excluded from Index for  ::[" + docName + "]");
 
             return ApiOperations.deleteItem(docName);
-        } */
-
-       /* if (isExclude) {
-            log.log(Level.INFO, "Checking for Exclusion  ::[" + docName + "]");
-            if (fileExclusion.IsExcluded(docName))
-            {
-                log.log(Level.INFO, "File Excluded from Index for  ::[" + docName + "]");
-
-                return ApiOperations.deleteItem(docName);
-            }
         }
-        else  {
-            log.log(Level.INFO, "Checking for Inclusion  ::[" + docName + "]");
-            if (!fileExclusion.IsExcluded(docName))
-            {
-                log.log(Level.INFO, "File Excluded from Index for  ::[" + docName + "]");
-
-                return ApiOperations.deleteItem(docName);
-            }
-
-        }*/
-if (!filePatterns.isInclude(docName))
-{
-    log.log(Level.INFO, "File Excluded from Index for  ::[" + docName + "]");
-
-    return ApiOperations.deleteItem(docName);
-}
-            log.log(Level.INFO, "File Included for  Indexing for  ::[" + docName + "]");
+        log.log(Level.INFO, "File Included for  Indexing for  ::[" + docName + "]");
 
 
         // Ignore ACL fragment containers. ItemType is not set in the Item passed here (or we
@@ -919,23 +957,24 @@ if (!filePatterns.isInclude(docName))
                         new Object[]{doc, attrs.lastModifiedTime().toString().substring(0, 10)});
                 return ApiOperations.deleteItem(docName);
             }
-      if(ACCEPTED.toString().equals(docItem.getStatus().getCode())) {
-        log.log(Level.FINEST, "Not re-indexing item because it is not modified");
-        PushItem notModified = new PushItem().setType("NOT_MODIFIED");
-        return new PushItems.Builder().addPushItem(docItem.getName(), notModified).build();
-      }
+            if (ACCEPTED.toString().equals(docItem.getStatus().getCode())) {
+                log.log(Level.INFO, "Not re-indexing item because it is not modified");
+                PushItem notModified = new PushItem().setType("NOT_MODIFIED");
+                return new PushItems.Builder().addPushItem(docItem.getName(), notModified).build();
+            }
         }
 
         Date lastModified = new Date(attrs.lastModifiedTime().toMillis());
         Date created = new Date(attrs.creationTime().toMillis());
+        log.log(Level.INFO, "Re-indexing item::[" + docName + "] with  last modified date::[" + attrs.lastModifiedTime().toString() + "]");
 
         ItemMetadata metadata =
                 new ItemMetadata()
                         .setTitle(getTitle(doc))
                         .setSourceRepositoryUrl(doc.toUri().toString())
                         .setCreateTime(new DateTime(created).toStringRfc3339())
-            .setUpdateTime(new DateTime(lastModified).toStringRfc3339())
-            .setHash(String.valueOf(lastModified.getTime()));
+                        .setUpdateTime(new DateTime(lastModified).toStringRfc3339())
+                        .setHash(String.valueOf(lastModified.getTime()));
         if (parent != null) {
             metadata.setContainerName(parent);
         }
@@ -1041,7 +1080,7 @@ if (!filePatterns.isInclude(docName))
     /**
      * Returns the parent of a Path, or its root if it has no parent,
      * or null if already at root.
-     *
+     * <p>
      * UNC paths to DFS namespaces and DFS links behave somewhat oddly.
      * A DFS namespace contains one or more DFS links with a path like
      * \\host\namespace\link. However a call to Path.getParent() for
@@ -1219,7 +1258,8 @@ if (!filePatterns.isInclude(docName))
                     continue;
                 }
                 if (children++ < largeDirectoryLimit) {
-          operationBuilder.addChildId(docId, new PushItem().setMetadataHash(String.valueOf(file.toFile().lastModified())));
+                    operationBuilder.addChildId(docId, new PushItem().setMetadataHash(String.valueOf(file.toFile().lastModified())));
+                    log.log(Level.INFO, "Pushing::[" + docId + "] with TimeStamp::[" + String.valueOf(file.toFile().lastModified()) + "]");
                 } else {
                     log.log(Level.FINE, "Listing of children for {0} exceeds largeDirectoryLimit of {1}."
                                     + " Switching to asynchronous feed of child IDs.",
@@ -1256,7 +1296,8 @@ if (!filePatterns.isInclude(docName))
                         log.log(Level.WARNING, "Not pushing " + path, e);
                         continue;
                     }
-          builder.addPushItem(docid, new PushItem().setMetadataHash(String.valueOf(path.toFile().lastModified())));
+                    builder.addPushItem(docid, new PushItem().setMetadataHash(String.valueOf(path.toFile().lastModified())));
+                    log.log(Level.INFO, "Pushing::[" + docid + "] with TimeStamp::[" + String.valueOf(path.toFile().lastModified()) + "]");
                     count++;
                     if (count % ASYNC_PUSH_ITEMS_BATCH_SIZE == 0) {
                         context.postApiOperationAsync(builder.build());
@@ -1376,8 +1417,9 @@ if (!filePatterns.isInclude(docName))
 
     /**
      * Load mime types from properties file.
+     *
      * @param userMimeTypes the mime types file
-     * @param defaults the default properties; overridden by values from userMimeTypes
+     * @param defaults      the default properties; overridden by values from userMimeTypes
      * @return a Properties.
      */
     @VisibleForTesting
@@ -1488,7 +1530,9 @@ if (!filePatterns.isInclude(docName))
         }
     }
 
-    /** Returns the startPath that {@code doc} resides under. */
+    /**
+     * Returns the startPath that {@code doc} resides under.
+     */
     private Path getStartPath(Path doc) throws RepositoryException {
         for (Path startPath : startPaths) {
             if (doc.startsWith(startPath)) {
@@ -1519,7 +1563,9 @@ if (!filePatterns.isInclude(docName))
         }
     }
 
-    /** These are the cached entities in the isVisibleCache. */
+    /**
+     * These are the cached entities in the isVisibleCache.
+     */
     private static enum HiddenType {
         VISIBLE, HIDDEN, HIDDEN_UNDER, NOT_UNDER_STARTPATH
     }
