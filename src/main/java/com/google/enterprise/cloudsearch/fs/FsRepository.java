@@ -811,7 +811,6 @@ public class FsRepository implements Repository {
     Date lastModified = new Date(attrs.lastModifiedTime().toMillis());
     Date created = new Date(attrs.creationTime().toMillis());
 
-
     ItemMetadata metadata =
         new ItemMetadata()
             .setTitle(getTitle(doc))
