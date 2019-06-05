@@ -874,7 +874,7 @@ public class FsRepository implements Repository {
 
             return ApiOperations.deleteItem(docName);
         }
-        log.log(Level.INFO, "File Included for  Indexing for  ::[" + docName + "]");
+        log.log(Level.INFO, "File Included for  Indexing for  ::[" + docName + "] status=[" + docItem.getStatus().getCode() + "]");
 
 
         // Ignore ACL fragment containers. ItemType is not set in the Item passed here (or we
