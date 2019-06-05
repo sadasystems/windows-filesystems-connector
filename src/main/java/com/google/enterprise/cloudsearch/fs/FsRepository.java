@@ -271,13 +271,13 @@ public class FsRepository implements Repository {
   @VisibleForTesting static final String SHARE_ACL = "shareAcl";
 
   private static final List<String> DEFAULT_SUPPORTED_ACCOUNTS =
-      ImmutableList.of(
-          "BUILTIN\\Administrators",
-          "Everyone",
-          "BUILTIN\\Users",
-          "BUILTIN\\Guest",
-          "NT AUTHORITY\\INTERACTIVE",
-          "NT AUTHORITY\\Authenticated Users");
+          ImmutableList.of(
+                  "BUILTIN\\Administrators",
+                  "Everyone",
+                  "BUILTIN\\Users",
+                  "BUILTIN\\Guest",
+                  "NT AUTHORITY\\INTERACTIVE",
+                  "NT AUTHORITY\\Authenticated Users");
 
   /** The number of items in a batch, when pushing directory contents asynchronously. */
   @VisibleForTesting static final int ASYNC_PUSH_ITEMS_BATCH_SIZE = 100;
@@ -378,19 +378,19 @@ public class FsRepository implements Repository {
     String identitySource = Configuration.getString(IDENTITY_SOURCE_ID, "").get();
     if (identitySource.isEmpty()) {
       throw new InvalidConfigurationException("The configuration value "
-          + IDENTITY_SOURCE_ID + " is empty. Please specify a valid identity source.");
+              + IDENTITY_SOURCE_ID + " is empty. Please specify a valid identity source.");
     }
 
     String sources = Configuration.getString(CONFIG_SRC, "").get();
     if (sources.isEmpty()) {
       throw new InvalidConfigurationException("The configuration value "
-          + CONFIG_SRC + " is empty. Please specify a valid root path.");
+              + CONFIG_SRC + " is empty. Please specify a valid root path.");
     }
     try {
       startPaths = getStartPaths(sources, Configuration.getString(CONFIG_SRC_SEPARATOR, ";").get());
     } catch (InvalidPathException e) {
       throw new InvalidConfigurationException(CONFIG_SRC
-          + " contains an invalid start path. " + e.getMessage());
+              + " contains an invalid start path. " + e.getMessage());
     } catch (IOException e) {
       throw new InvalidConfigurationException("Exception during resolving start paths", e);
     }
@@ -399,9 +399,9 @@ public class FsRepository implements Repository {
     log.log(Level.CONFIG, "builtinPrefix: {0}", builtinPrefix);
 
     List<String> accountsStr =
-        Configuration.getMultiValue(
-                CONFIG_SUPPORTED_ACCOUNTS, DEFAULT_SUPPORTED_ACCOUNTS, Configuration.STRING_PARSER)
-            .get();
+            Configuration.getMultiValue(
+                    CONFIG_SUPPORTED_ACCOUNTS, DEFAULT_SUPPORTED_ACCOUNTS, Configuration.STRING_PARSER)
+                    .get();
     supportedWindowsAccounts = ImmutableSet.copyOf(accountsStr);
     log.log(Level.CONFIG, "supportedWindowsAccounts: {0}", supportedWindowsAccounts);
 
@@ -416,26 +416,26 @@ public class FsRepository implements Repository {
 
     try {
       preserveLastAccessTime =
-          Enum.valueOf(
-              PreserveLastAccessTime.class,
-              Configuration.getString(
-                      CONFIG_PRESERVE_LAST_ACCESS_TIME, PreserveLastAccessTime.ALWAYS.toString())
-                  .get());
+              Enum.valueOf(
+                      PreserveLastAccessTime.class,
+                      Configuration.getString(
+                              CONFIG_PRESERVE_LAST_ACCESS_TIME, PreserveLastAccessTime.ALWAYS.toString())
+                              .get());
     } catch (IllegalArgumentException e) {
       throw new InvalidConfigurationException("The value of "
-          + CONFIG_PRESERVE_LAST_ACCESS_TIME + " must be one of "
-          + EnumSet.allOf(PreserveLastAccessTime.class) + ".", e);
+              + CONFIG_PRESERVE_LAST_ACCESS_TIME + " must be one of "
+              + EnumSet.allOf(PreserveLastAccessTime.class) + ".", e);
     }
     log.log(Level.CONFIG, "preserveLastAccessTime: {0}",
-        preserveLastAccessTime);
+            preserveLastAccessTime);
 
     int directoryCacheSize = Configuration.getInteger(CONFIG_DIRECTORY_CACHE_SIZE, 50000).get();
     log.log(Level.CONFIG, "directoryCacheSize: {0}", directoryCacheSize);
     isVisibleCache = CacheBuilder.newBuilder()
-        .initialCapacity(directoryCacheSize / 4)
-        .maximumSize(directoryCacheSize)
-        .expireAfterWrite(4, TimeUnit.HOURS) // Notice if someone hides a dir.
-        .build();
+            .initialCapacity(directoryCacheSize / 4)
+            .maximumSize(directoryCacheSize)
+            .expireAfterWrite(4, TimeUnit.HOURS) // Notice if someone hides a dir.
+            .build();
 
     if (context.getDefaultAclMode() == DefaultAclMode.FALLBACK) {
       log.log(Level.WARNING, "The default ACL in FALLBACK mode will be ignored.");
@@ -448,7 +448,7 @@ public class FsRepository implements Repository {
     // Add filters that may exclude older content.
     lastAccessTimeFilter = getFileTimeFilter(CONFIG_LAST_ACCESSED_DAYS, CONFIG_LAST_ACCESSED_DATE);
     lastModifiedTimeFilter =
-        getFileTimeFilter(CONFIG_LAST_MODIFIED_DAYS, CONFIG_LAST_MODIFIED_DATE);
+            getFileTimeFilter(CONFIG_LAST_MODIFIED_DAYS, CONFIG_LAST_MODIFIED_DATE);
 
     monitorForUpdates = Configuration.getBoolean(CONFIG_MONITOR_UPDATES, Boolean.TRUE).get();
     log.log(Level.CONFIG, "monitorForUpdates: {0}", monitorForUpdates);
@@ -477,14 +477,14 @@ public class FsRepository implements Repository {
   /** Parses the collection of startPaths from the supplied sources. */
   @VisibleForTesting
   Set<Path> getStartPaths(String sources, String separator)
-      throws IOException, InvalidPathException {
+          throws IOException, InvalidPathException {
     if (separator.isEmpty()) {
       // No separator implies a single startPath.
       return ImmutableSet.of(delegate.getPath(sources));
     }
     ImmutableSet.Builder<Path> builder = ImmutableSet.builder();
     Iterable<String> startPoints = Splitter.on(separator)
-        .trimResults().omitEmptyStrings().split(sources);
+            .trimResults().omitEmptyStrings().split(sources);
     for (String startPoint : startPoints) {
       Path startPath = delegate.getPath(startPoint);
       builder.add(startPath);
@@ -496,18 +496,18 @@ public class FsRepository implements Repository {
   /** Verify that a startPath is valid. */
   @VisibleForTesting
   void validateStartPath(Path startPath, boolean logging)
-      throws IOException, InvalidConfigurationException {
+          throws IOException, InvalidConfigurationException {
     try {
       delegate.newDocId(startPath);
     } catch (IOException e) {
       throw new InvalidConfigurationException("The path " + startPath
-             + " is not valid path - " + e.getMessage() + ".");
+              + " is not valid path - " + e.getMessage() + ".");
     }
 
     if (!crawlHiddenFiles && delegate.isHidden(startPath)) {
       throw new InvalidConfigurationException("The path " + startPath + " is "
-          + "hidden. To crawl hidden content, you must set the configuration "
-          + "property \"fs.crawlHiddenFiles\" to \"true\".");
+              + "hidden. To crawl hidden content, you must set the configuration "
+              + "property \"fs.crawlHiddenFiles\" to \"true\".");
     }
 
     // Using a path of \\host\ns\link\FolderA will be
@@ -542,7 +542,7 @@ public class FsRepository implements Repository {
     } else {
       if (logging) {
         log.log(Level.INFO, "Using a {0}DFS path {1}", new Object[] {
-            ((getDfsRoot(startPath) == null) ? "non-" : ""), startPath });
+                ((getDfsRoot(startPath) == null) ? "non-" : ""), startPath });
       }
       validateShare(startPath);
     }
@@ -563,7 +563,7 @@ public class FsRepository implements Repository {
   void validateShare(Path sharePath) throws IOException {
     if (delegate.isDfsNamespace(sharePath)) {
       throw new AssertionError("validateShare may only be called "
-          + "on DFS links or active storage paths.");
+              + "on DFS links or active storage paths.");
     }
 
     // Verify that the connector has permission to read the contents of the root.
@@ -571,18 +571,18 @@ public class FsRepository implements Repository {
       delegate.newDirectoryStream(sharePath).close();
     } catch (AccessDeniedException e) {
       throw new IOException("Unable to list the contents of " + sharePath + ". This can happen if "
-          + "the Windows account used to crawl the path does not have sufficient permissions.", e);
+              + "the Windows account used to crawl the path does not have sufficient permissions.", e);
     } catch (NotDirectoryException e) {
       throw new InvalidConfigurationException("The path " + sharePath
-          + " is not a directory. Acceptable paths need to be either "
-          + "\\\\host\\namespace or \\\\host\\namespace\\link or \\\\host\\shared directory.");
+              + " is not a directory. Acceptable paths need to be either "
+              + "\\\\host\\namespace or \\\\host\\namespace\\link or \\\\host\\shared directory.");
     } catch (FileNotFoundException e) {
       throw new InvalidConfigurationException("The path " + sharePath + " was not found.");
     } catch (NoSuchFileException e) {
       throw new InvalidConfigurationException("The path " + sharePath + " was not found.");
     } catch (IOException e) {
       throw new IOException("The path " + sharePath + " is not accessible. The path does not exist,"
-          + " or it is not shared, or its hosting file server is currently unavailable.", e);
+              + " or it is not shared, or its hosting file server is currently unavailable.", e);
     }
 
     // Verify that the connector has permission to read the ACL and share ACL.
@@ -591,29 +591,29 @@ public class FsRepository implements Repository {
       delegate.getAclViews(sharePath);
     } catch (IOException e) {
       throw new IOException("Unable to read ACLs for " + sharePath
-          + ". This can happen if the Windows account used to crawl the path does not have "
-          + "sufficient permissions. A Windows account with sufficient permissions to read content,"
-          + " attributes and ACLs is required to crawl a path.", e);
+              + ". This can happen if the Windows account used to crawl the path does not have "
+              + "sufficient permissions. A Windows account with sufficient permissions to read content,"
+              + " attributes and ACLs is required to crawl a path.", e);
     }
   }
 
   private FileTimeFilter getFileTimeFilter(String configDaysKey, String configDateKey)
-      throws StartupException {
+          throws StartupException {
     String configDays = Configuration.getString(configDaysKey, "").get();
     String configDate = Configuration.getString(configDateKey, "").get();
     if (!configDays.isEmpty() && !configDate.isEmpty()) {
       throw new InvalidConfigurationException("Please specify only one of "
-          + configDaysKey + " or " + configDateKey + ".");
+              + configDaysKey + " or " + configDateKey + ".");
     } else if (!configDays.isEmpty()) {
       log.log(Level.CONFIG, configDaysKey + ": " + configDays);
       try {
         return new ExpiringFileTimeFilter(Integer.parseInt(configDays));
       } catch (NumberFormatException e) {
         throw new InvalidConfigurationException(configDaysKey
-            + " must be specified as a positive integer number of days.", e);
+                + " must be specified as a positive integer number of days.", e);
       } catch (IllegalArgumentException e) {
         throw new InvalidConfigurationException(configDaysKey
-            + " must be specified as a positive integer number of days.", e);
+                + " must be specified as a positive integer number of days.", e);
       }
     } else if (!configDate.isEmpty()) {
       log.log(Level.CONFIG, configDateKey + ": " + configDate);
@@ -622,10 +622,10 @@ public class FsRepository implements Repository {
       iso8601DateFormat.setLenient(true);
       try {
         return new AbsoluteFileTimeFilter(FileTime.fromMillis(
-            iso8601DateFormat.parse(configDate).getTime()));
+                iso8601DateFormat.parse(configDate).getTime()));
       } catch (ParseException e) {
         throw new InvalidConfigurationException(configDateKey
-            + " must be specified in the format \"YYYY-MM-DD\".", e);
+                + " must be specified in the format \"YYYY-MM-DD\".", e);
       } catch (IllegalArgumentException e) {
         throw new InvalidConfigurationException(configDateKey + " must be a date in the past.", e);
       }
@@ -645,17 +645,17 @@ public class FsRepository implements Repository {
       // that allows everyone.
       dfsShareAcl = null;
       shareAcl = new Acl.Builder()
-          .setReaders(Collections.singleton(Acl.getCustomerPrincipal()))
-          .build();
+              .setReaders(Collections.singleton(Acl.getCustomerPrincipal()))
+              .build();
     } else if (delegate.isDfsNamespace(share)) {
       throw new AssertionError("readShareAcls may only be called "
-          + "on DFS links or active storage paths.");
+              + "on DFS links or active storage paths.");
     } else if (dfsRoot != null && delegate.isDfsLink(dfsRoot)) {
       // For a DFS UNC we have a DFS ACL that must be sent. Also, the share ACL
       // must be the ACL for the target storage UNC.
       AclBuilder builder = new AclBuilder(share,
-          delegate.getDfsShareAclView(dfsRoot),
-          supportedWindowsAccounts, builtinPrefix, supportedDomain);
+              delegate.getDfsShareAclView(dfsRoot),
+              supportedWindowsAccounts, builtinPrefix, supportedDomain);
       dfsShareAcl = builder.getAcl().build();
 
       // Push the ACL for the active storage UNC path.
@@ -665,16 +665,16 @@ public class FsRepository implements Repository {
       }
 
       builder = new AclBuilder(activeStorage,
-          delegate.getShareAclView(activeStorage),
-          supportedWindowsAccounts, builtinPrefix, supportedDomain);
+              delegate.getShareAclView(activeStorage),
+              supportedWindowsAccounts, builtinPrefix, supportedDomain);
       shareAcl = builder.getAcl()
-          .setInheritFrom(delegate.newDocId(dfsRoot), DFS_SHARE_ACL)
-          .setInheritanceType(InheritanceType.BOTH_PERMIT).build();
+              .setInheritFrom(delegate.newDocId(dfsRoot), DFS_SHARE_ACL)
+              .setInheritanceType(InheritanceType.BOTH_PERMIT).build();
     } else {
       // For a non-DFS UNC we have only have a share ACL to push.
       AclBuilder builder = new AclBuilder(share,
-          delegate.getShareAclView(share),
-          supportedWindowsAccounts, builtinPrefix, supportedDomain);
+              delegate.getShareAclView(share),
+              supportedWindowsAccounts, builtinPrefix, supportedDomain);
       dfsShareAcl = null;
       shareAcl = builder.getAcl().build();
     }
@@ -684,7 +684,7 @@ public class FsRepository implements Repository {
 
   @Override
   public CheckpointCloseableIterable<ApiOperation> getIds(byte[] checkpoint)
-      throws RepositoryException {
+          throws RepositoryException {
     log.entering("FsConnector", "getIds");
     PushItems.Builder builder = new PushItems.Builder();
     for (Path startPath : startPaths) {
@@ -712,7 +712,7 @@ public class FsRepository implements Repository {
     ApiOperation operation = builder.build();
     log.exiting("FsConnector", "getIds");
     return new CheckpointCloseableIterableImpl.Builder<ApiOperation>(
-        Arrays.asList(operation)).build();
+            Arrays.asList(operation)).build();
   }
 
   @Override
@@ -748,7 +748,7 @@ public class FsRepository implements Repository {
       doc = delegate.getPath(docName);
       if (doc == null) {
         log.log(
-            Level.WARNING, "The docid {0} is not a valid id generated by the connector.", docName);
+                Level.WARNING, "The docid {0} is not a valid id generated by the connector.", docName);
         return ApiOperations.deleteItem(docName);
       }
       isRoot = startPaths.contains(doc) || delegate.isDfsLink(doc);
@@ -756,7 +756,7 @@ public class FsRepository implements Repository {
       parent = (isRoot || docParent == null) ? null : delegate.newDocId(docParent);
     } catch (InvalidPathException e) {
       log.log(
-          Level.WARNING, "The docid {0} is not a valid id generated by the connector.", docName);
+              Level.WARNING, "The docid {0} is not a valid id generated by the connector.", docName);
       return ApiOperations.deleteItem(docName);
     } catch (IOException e) {
       throw new RepositoryException.Builder().setCause(e).setErrorMessage(docName).build();
@@ -793,12 +793,12 @@ public class FsRepository implements Repository {
     if (!docIsDirectory) {
       if (lastAccessTimeFilter.excluded(lastAccessTime)) {
         log.log(Level.FINE, "Deleting {0} because it was last accessed {1}.",
-            new Object[] {doc, lastAccessTime.toString().substring(0, 10)});
+                new Object[] {doc, lastAccessTime.toString().substring(0, 10)});
         return ApiOperations.deleteItem(docName);
       }
       if (lastModifiedTimeFilter.excluded(attrs.lastModifiedTime())) {
         log.log(Level.FINE, "Deleting {0} because it was last modified {1}.",
-            new Object[] {doc, attrs.lastModifiedTime().toString().substring(0, 10)});
+                new Object[] {doc, attrs.lastModifiedTime().toString().substring(0, 10)});
         return ApiOperations.deleteItem(docName);
       }
       if(ACCEPTED.toString().equals(docItem.getStatus().getCode())) {
@@ -812,18 +812,18 @@ public class FsRepository implements Repository {
     Date created = new Date(attrs.creationTime().toMillis());
 
     ItemMetadata metadata =
-        new ItemMetadata()
-            .setTitle(getTitle(doc))
-            .setSourceRepositoryUrl(doc.toUri().toString())
-            .setCreateTime(new DateTime(created).toStringRfc3339())
-            .setUpdateTime(new DateTime(lastModified).toStringRfc3339())
-            .setHash(String.valueOf(lastModified.getTime()));
+            new ItemMetadata()
+                    .setTitle(getTitle(doc))
+                    .setSourceRepositoryUrl(doc.toUri().toString())
+                    .setCreateTime(new DateTime(created).toStringRfc3339())
+                    .setUpdateTime(new DateTime(lastModified).toStringRfc3339())
+                    .setHash(String.valueOf(lastModified.getTime()));
     if (parent != null) {
       metadata.setContainerName(parent);
     }
     Item item = new Item()
-        .setName(docName)
-        .setMetadata(metadata);
+            .setName(docName)
+            .setMetadata(metadata);
     RepositoryDoc.Builder operationBuilder = new RepositoryDoc.Builder();
     operationBuilder.setItem(item);
     operationBuilder.setRequestMode(RequestMode.ASYNCHRONOUS);
@@ -884,12 +884,12 @@ public class FsRepository implements Repository {
         String itemInheritAclFrom = item.getAcl().getInheritAclFrom();
         for (Map.Entry<String, Acl> fragment : aclFragments.entrySet()) {
           Item fragmentItem = fragment.getValue()
-              .createFragmentItemOf(item.getName(), fragment.getKey());
+                  .createFragmentItemOf(item.getName(), fragment.getKey());
           if (!isRoot && !fragmentItem.getName().equals(itemInheritAclFrom)) {
             fragmentItem.setMetadata(new ItemMetadata().setContainerName(item.getName()));
           } else {
             log.log(Level.FINER,
-                "Not setting container for acl fragment item: " + fragmentItem.getName());
+                    "Not setting container for acl fragment item: " + fragmentItem.getName());
           }
           RepositoryDoc.Builder fragmentOperationBuilder = new RepositoryDoc.Builder();
           fragmentOperationBuilder.setItem(fragmentItem);
@@ -956,8 +956,8 @@ public class FsRepository implements Repository {
       // Files and folders that do not inherit permissions from their parent
       // inherit directly from the share ACL. Crawl up to node with share ACL.
       for (inheritFrom = doc;
-          !startPaths.contains(inheritFrom) && !delegate.isDfsLink(inheritFrom);
-          inheritFrom = getParent(inheritFrom)) {
+           !startPaths.contains(inheritFrom) && !delegate.isDfsLink(inheritFrom);
+           inheritFrom = getParent(inheritFrom)) {
         // Empty body.
       }
     } else {
@@ -966,7 +966,7 @@ public class FsRepository implements Repository {
     }
     if (inheritFrom == null) {
       throw new RepositoryException.Builder()
-          .setErrorMessage("Unable to determine inherited ACL for " + doc).build();
+              .setErrorMessage("Unable to determine inherited ACL for " + doc).build();
     }
     String inheritFromDocId = delegate.newDocId(inheritFrom);
 
@@ -974,22 +974,22 @@ public class FsRepository implements Repository {
     Acl acl;
     if (isRoot || hasNoInheritedAcl) {
       builder = new AclBuilder(doc, aclViews.getCombinedAclView(),
-          supportedWindowsAccounts, builtinPrefix, supportedDomain);
+              supportedWindowsAccounts, builtinPrefix, supportedDomain);
       acl = builder.getAcl()
-          .setInheritFrom(inheritFromDocId, SHARE_ACL)
-          .setInheritanceType(InheritanceType.BOTH_PERMIT).build();
+              .setInheritFrom(inheritFromDocId, SHARE_ACL)
+              .setInheritanceType(InheritanceType.BOTH_PERMIT).build();
     } else {
       builder = new AclBuilder(doc, aclViews.getDirectAclView(),
-          supportedWindowsAccounts, builtinPrefix, supportedDomain);
+              supportedWindowsAccounts, builtinPrefix, supportedDomain);
       if (isDirectory) {
         acl = builder.getAcl()
-            .setInheritFrom(inheritFromDocId, CHILD_FOLDER_INHERIT_ACL)
-            .setInheritanceType(InheritanceType.CHILD_OVERRIDE).build();
+                .setInheritFrom(inheritFromDocId, CHILD_FOLDER_INHERIT_ACL)
+                .setInheritanceType(InheritanceType.CHILD_OVERRIDE).build();
       } else {
         acl = builder.getAcl()
-            .setInheritFrom(inheritFromDocId, CHILD_FILE_INHERIT_ACL)
-            .setInheritanceType(InheritanceType.CHILD_OVERRIDE)
-            .build();
+                .setInheritFrom(inheritFromDocId, CHILD_FILE_INHERIT_ACL)
+                .setInheritanceType(InheritanceType.CHILD_OVERRIDE)
+                .build();
       }
     }
     log.log(Level.FINEST, "Setting Acl: doc: {0}, acl: {1}", new Object[] { doc, acl });
@@ -1002,38 +1002,38 @@ public class FsRepository implements Repository {
     if (isDirectory) {
       if (isRoot || hasNoInheritedAcl) {
         aclFragments.put(ALL_FOLDER_INHERIT_ACL,
-            builder.getInheritableByAllDescendentFoldersAcl()
-            .setInheritFrom(inheritFromDocId, SHARE_ACL)
-            .setInheritanceType(InheritanceType.BOTH_PERMIT).build());
+                builder.getInheritableByAllDescendentFoldersAcl()
+                        .setInheritFrom(inheritFromDocId, SHARE_ACL)
+                        .setInheritanceType(InheritanceType.BOTH_PERMIT).build());
         aclFragments.put(ALL_FILE_INHERIT_ACL,
-            builder.getInheritableByAllDescendentFilesAcl()
-            .setInheritFrom(inheritFromDocId, SHARE_ACL)
-            .setInheritanceType(InheritanceType.BOTH_PERMIT).build());
+                builder.getInheritableByAllDescendentFilesAcl()
+                        .setInheritFrom(inheritFromDocId, SHARE_ACL)
+                        .setInheritanceType(InheritanceType.BOTH_PERMIT).build());
         aclFragments.put(CHILD_FOLDER_INHERIT_ACL,
-            builder.getInheritableByChildFoldersOnlyAcl()
-            .setInheritFrom(inheritFromDocId, SHARE_ACL)
-            .setInheritanceType(InheritanceType.BOTH_PERMIT).build());
+                builder.getInheritableByChildFoldersOnlyAcl()
+                        .setInheritFrom(inheritFromDocId, SHARE_ACL)
+                        .setInheritanceType(InheritanceType.BOTH_PERMIT).build());
         aclFragments.put(CHILD_FILE_INHERIT_ACL,
-            builder.getInheritableByChildFilesOnlyAcl()
-            .setInheritFrom(inheritFromDocId, SHARE_ACL)
-            .setInheritanceType(InheritanceType.BOTH_PERMIT).build());
+                builder.getInheritableByChildFilesOnlyAcl()
+                        .setInheritFrom(inheritFromDocId, SHARE_ACL)
+                        .setInheritanceType(InheritanceType.BOTH_PERMIT).build());
       } else {
         aclFragments.put(ALL_FOLDER_INHERIT_ACL,
-            builder.getInheritableByAllDescendentFoldersAcl()
-            .setInheritFrom(inheritFromDocId, ALL_FOLDER_INHERIT_ACL)
-            .setInheritanceType(InheritanceType.CHILD_OVERRIDE).build());
+                builder.getInheritableByAllDescendentFoldersAcl()
+                        .setInheritFrom(inheritFromDocId, ALL_FOLDER_INHERIT_ACL)
+                        .setInheritanceType(InheritanceType.CHILD_OVERRIDE).build());
         aclFragments.put(ALL_FILE_INHERIT_ACL,
-            builder.getInheritableByAllDescendentFilesAcl()
-            .setInheritFrom(inheritFromDocId, ALL_FILE_INHERIT_ACL)
-            .setInheritanceType(InheritanceType.CHILD_OVERRIDE).build());
+                builder.getInheritableByAllDescendentFilesAcl()
+                        .setInheritFrom(inheritFromDocId, ALL_FILE_INHERIT_ACL)
+                        .setInheritanceType(InheritanceType.CHILD_OVERRIDE).build());
         aclFragments.put(CHILD_FOLDER_INHERIT_ACL,
-            builder.getInheritableByChildFoldersOnlyAcl()
-            .setInheritFrom(inheritFromDocId, ALL_FOLDER_INHERIT_ACL)
-            .setInheritanceType(InheritanceType.CHILD_OVERRIDE).build());
+                builder.getInheritableByChildFoldersOnlyAcl()
+                        .setInheritFrom(inheritFromDocId, ALL_FOLDER_INHERIT_ACL)
+                        .setInheritanceType(InheritanceType.CHILD_OVERRIDE).build());
         aclFragments.put(CHILD_FILE_INHERIT_ACL,
-            builder.getInheritableByChildFilesOnlyAcl()
-            .setInheritFrom(inheritFromDocId, ALL_FILE_INHERIT_ACL)
-            .setInheritanceType(InheritanceType.CHILD_OVERRIDE).build());
+                builder.getInheritableByChildFilesOnlyAcl()
+                        .setInheritFrom(inheritFromDocId, ALL_FILE_INHERIT_ACL)
+                        .setInheritanceType(InheritanceType.CHILD_OVERRIDE).build());
       }
     }
     return aclFragments;
@@ -1041,7 +1041,7 @@ public class FsRepository implements Repository {
 
   /* Adds namespace's DFS links as children of the namespace. */
   private void getDfsNamespaceContent(Path doc, Item item, RepositoryDoc.Builder operationBuilder)
-      throws IOException {
+          throws IOException {
     item.setItemType(ItemType.VIRTUAL_CONTAINER_ITEM.name());
     for (Path link : delegate.enumerateDfsLinks(doc)) {
       final String docId;
@@ -1049,7 +1049,7 @@ public class FsRepository implements Repository {
         docId = delegate.newDocId(link);
       } catch (IllegalArgumentException e) {
         log.log(Level.WARNING, "Skipping DFS link {0} because {1}.",
-            new Object[] {link, e.getMessage()});
+                new Object[] {link, e.getMessage()});
         continue;
       }
       operationBuilder.addChildId(docId, new PushItem());
@@ -1057,8 +1057,8 @@ public class FsRepository implements Repository {
   }
 
   private void getDirectoryContent(
-      Path doc, FileTime lastAccessTime, Item item, RepositoryDoc.Builder operationBuilder)
-      throws IOException {
+          Path doc, FileTime lastAccessTime, Item item, RepositoryDoc.Builder operationBuilder)
+          throws IOException {
     if (indexFolders) {
       item.setItemType(ItemType.CONTAINER_ITEM.name());
     } else {
@@ -1082,8 +1082,8 @@ public class FsRepository implements Repository {
           operationBuilder.addChildId(docId, new PushItem().setMetadataHash(String.valueOf(file.toFile().lastModified())));
         } else {
           log.log(Level.FINE, "Listing of children for {0} exceeds largeDirectoryLimit of {1}."
-              + " Switching to asynchronous feed of child IDs.",
-              new Object[] { doc, largeDirectoryLimit });
+                          + " Switching to asynchronous feed of child IDs.",
+                  new Object[] { doc, largeDirectoryLimit });
           asyncDirectoryPusherService.submit(new AsyncDirectoryContentPusher(doc, lastAccessTime));
           break;
         }
@@ -1142,7 +1142,7 @@ public class FsRepository implements Repository {
 
   /* Adds the file's content to the response. */
   private void getFileContent(Path doc, FileTime lastAccessTime, Item item,
-      RepositoryDoc.Builder operationBuilder) throws IOException {
+                              RepositoryDoc.Builder operationBuilder) throws IOException {
     String mimeType = getDocMimeType(doc);
     item.getMetadata().setMimeType(mimeType);
     item.setItemType(ItemType.CONTENT_ITEM.name());
@@ -1195,31 +1195,31 @@ public class FsRepository implements Repository {
     // mime type mapping from Microsoft Technet reference.
     // https://technet.microsoft.com/en-us/library/ee309278(office.12).aspx
     properties.setProperty("docx",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     properties.setProperty("docm", "application/vnd.ms-word.document.macroEnabled.12");
     properties.setProperty("dotx",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.template");
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.template");
     properties.setProperty("dotm", "application/vnd.ms-word.template.macroEnabled.12");
     properties.setProperty("xlsx",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     properties.setProperty("xlsm", "application/vnd.ms-excel.sheet.macroEnabled.12");
     properties.setProperty("xltx",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.template");
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.template");
     properties.setProperty("xltm", "application/vnd.ms-excel.template.macroEnabled.12");
     properties.setProperty("xlsb", "application/vnd.ms-excel.sheet.binary.macroEnabled.12");
     properties.setProperty("xlam", "application/vnd.ms-excel.addin.macroEnabled.12");
     properties.setProperty("pptx",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation");
     properties.setProperty("pptm", "application/vnd.ms-powerpoint.presentation.macroEnabled.12");
     properties.setProperty("ppsx",
-        "application/vnd.openxmlformats-officedocument.presentationml.slideshow");
+            "application/vnd.openxmlformats-officedocument.presentationml.slideshow");
     properties.setProperty("ppsm", "application/vnd.ms-powerpoint.slideshow.macroEnabled.12");
     properties.setProperty("potx",
-        "application/vnd.openxmlformats-officedocument.presentationml.template");
+            "application/vnd.openxmlformats-officedocument.presentationml.template");
     properties.setProperty("potm", "application/vnd.ms-powerpoint.template.macroEnabled.12");
     properties.setProperty("ppam", "application/vnd.ms-powerpoint.addin.macroEnabled.12");
     properties.setProperty("sldx",
-        "application/vnd.openxmlformats-officedocument.presentationml.slide");
+            "application/vnd.openxmlformats-officedocument.presentationml.slide");
     properties.setProperty("sldm", "application/vnd.ms-powerpoint.slide.macroEnabled.12");
 
     // Other MS Office mime types not included in the above reference.
@@ -1234,7 +1234,7 @@ public class FsRepository implements Repository {
   protected void setMimeTypeProperties(Properties prop) {
     for (String key : prop.stringPropertyNames()) {
       mimeTypeProperties.setProperty(key.toLowerCase(ENGLISH),
-          prop.getProperty(key));
+              prop.getProperty(key));
     }
   }
 
@@ -1251,7 +1251,7 @@ public class FsRepository implements Repository {
    * might not be preserved.
    */
   private void setLastAccessTime(Path doc, FileTime lastAccessTime)
-      throws IOException {
+          throws IOException {
     if (preserveLastAccessTime == PreserveLastAccessTime.NEVER) {
       return;
     }
@@ -1260,14 +1260,14 @@ public class FsRepository implements Repository {
     } catch (AccessDeniedException e) {
       if (preserveLastAccessTime == PreserveLastAccessTime.ALWAYS) {
         String message = String.format("Unable to restore the last access time "
-            + "for %1$s. This can happen if the Windows account used to crawl "
-            + "the path does not have sufficient permissions to write file "
-            + "attributes. If you do not wish to enforce preservation of the "
-            + "last access time for files and folders as they are crawled, "
-            + "please set the '%2$s' configuration property to '%3$s' or "
-            + "'%4$s'.",
-            new Object[] { doc.toString(), CONFIG_PRESERVE_LAST_ACCESS_TIME,
-                PreserveLastAccessTime.IF_ALLOWED, PreserveLastAccessTime.NEVER });
+                        + "for %1$s. This can happen if the Windows account used to crawl "
+                        + "the path does not have sufficient permissions to write file "
+                        + "attributes. If you do not wish to enforce preservation of the "
+                        + "last access time for files and folders as they are crawled, "
+                        + "please set the '%2$s' configuration property to '%3$s' or "
+                        + "'%4$s'.",
+                new Object[] { doc.toString(), CONFIG_PRESERVE_LAST_ACCESS_TIME,
+                        PreserveLastAccessTime.IF_ALLOWED, PreserveLastAccessTime.NEVER });
         log.log(Level.WARNING, message, e);
         Path startPath = getStartPath(doc);
         blockedPaths.add(startPath);
@@ -1287,7 +1287,7 @@ public class FsRepository implements Repository {
       }
     }
     throw new RepositoryException.Builder()
-        .setErrorMessage("Unable to determine the start path for " + doc).build();
+            .setErrorMessage("Unable to determine the start path for " + doc).build();
   }
 
   @VisibleForTesting
@@ -1312,7 +1312,7 @@ public class FsRepository implements Repository {
 
   /** These are the cached entities in the isVisibleCache. */
   private static enum HiddenType {
-      VISIBLE, HIDDEN, HIDDEN_UNDER, NOT_UNDER_STARTPATH
+    VISIBLE, HIDDEN, HIDDEN_UNDER, NOT_UNDER_STARTPATH
   }
 
   private static class Hidden {
@@ -1417,8 +1417,8 @@ public class FsRepository implements Repository {
 
     public AbsoluteFileTimeFilter(FileTime oldestAllowed) {
       Preconditions.checkArgument(oldestAllowed.compareTo(
-          FileTime.fromMillis(System.currentTimeMillis())) < 0,
-          oldestAllowed.toString().substring(0, 10) + " is in the future.");
+              FileTime.fromMillis(System.currentTimeMillis())) < 0,
+              oldestAllowed.toString().substring(0, 10) + " is in the future.");
       this.oldestAllowed = oldestAllowed;
     }
 
@@ -1434,7 +1434,7 @@ public class FsRepository implements Repository {
 
     public ExpiringFileTimeFilter(int daysOld) {
       Preconditions.checkArgument(daysOld > 0, "The number of days old for "
-          + "expired content must be greater than zero.");
+              + "expired content must be greater than zero.");
       this.relativeMillis = daysOld * MILLIS_PER_DAY;
     }
 
