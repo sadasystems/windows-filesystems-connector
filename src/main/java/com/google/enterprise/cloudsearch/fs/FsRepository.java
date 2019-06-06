@@ -54,6 +54,7 @@ import com.google.enterprise.cloudsearch.sdk.indexing.template.PushItems;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.Repository;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryContext;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryDoc;
+import org.apache.commons.codec.digest.DigestUtils;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
@@ -941,6 +942,10 @@ public class FsRepository implements Repository {
 
   /* Populate the document ACL in the response. */
   private Map<String, Acl> getFileAcls(Path doc, Item item) throws IOException {
+    // if DefaultAclMode is OVERRIDE, we can skip setting ACL or returning any ACL fragments
+    if(context.getDefaultAclMode() != DefaultAclMode.OVERRIDE) {
+      return new HashMap<>();
+    }
     if (delegate.isDfsNamespace(doc)) {
       throw new AssertionError("getFileAcls may not be called on DFS namespace paths.");
     }
@@ -1068,18 +1073,19 @@ public class FsRepository implements Repository {
     // enforces a time limit on calls to getDoc. If there are more items in the directory
     // than the configured limit, stop at the limit and use a separate thread to send the
     // complete contents.
-    try (DirectoryStream<Path> files = delegate.newDirectoryStream(doc)) {
+    try (DirectoryStream<Path> paths = delegate.newDirectoryStream(doc)) {
       int children = 0;
-      for (Path file : files) {
+      for (Path path : paths) {
         String docId;
         try {
-          docId = delegate.newDocId(file);
+          docId = delegate.newDocId(path);
         } catch (IllegalArgumentException e) {
-          log.log(Level.WARNING, "Skipping {0} because {1}.", new Object[] {file, e.getMessage()});
+          log.log(Level.WARNING, "Skipping {0} because {1}.", new Object[] {path, e.getMessage()});
           continue;
         }
         if (children++ < largeDirectoryLimit) {
-          operationBuilder.addChildId(docId, new PushItem().setMetadataHash(String.valueOf(file.toFile().lastModified())));
+          PushItem pushItem = getPushItem(path);
+          operationBuilder.addChildId(docId, pushItem);
         } else {
           log.log(Level.FINE, "Listing of children for {0} exceeds largeDirectoryLimit of {1}."
               + " Switching to asynchronous feed of child IDs.",
@@ -1091,6 +1097,23 @@ public class FsRepository implements Repository {
     } finally {
       setLastAccessTime(doc, lastAccessTime);
     }
+  }
+
+  /* Creates a PushItem for a Path. For Files, includes a metadataHash of the last modified date + ACL */
+  private PushItem getPushItem(Path file) throws IOException {
+    PushItem pushItem = new PushItem();
+    final boolean isDirectory = delegate.isDirectory(file);
+    if(!isDirectory) {
+      Item childItem = new Item();
+      getFileAcls(file, childItem);
+
+      StringBuilder hashBuilder = new StringBuilder();
+      hashBuilder.append(file.toFile().lastModified());
+      hashBuilder.append(childItem.getAcl());
+
+      pushItem.setMetadataHash(DigestUtils.md5Hex(hashBuilder.toString()));
+    }
+    return pushItem;
   }
 
   /* Pushes the directory's content. */
@@ -1116,7 +1139,8 @@ public class FsRepository implements Repository {
             log.log(Level.WARNING, "Not pushing " + path, e);
             continue;
           }
-          builder.addPushItem(docid, new PushItem().setMetadataHash(String.valueOf(path.toFile().lastModified())));
+          PushItem pushItem = getPushItem(path);
+          builder.addPushItem(docid, pushItem);
           count++;
           if (count % ASYNC_PUSH_ITEMS_BATCH_SIZE == 0) {
             context.postApiOperationAsync(builder.build());
