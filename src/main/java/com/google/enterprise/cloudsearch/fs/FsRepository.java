@@ -818,8 +818,7 @@ public class FsRepository implements Repository {
             .setTitle(getTitle(doc))
             .setSourceRepositoryUrl(doc.toUri().toString())
             .setCreateTime(new DateTime(created).toStringRfc3339())
-            .setUpdateTime(new DateTime(lastModified).toStringRfc3339())
-            .setHash(String.valueOf(lastModified.getTime()));
+            .setUpdateTime(new DateTime(lastModified).toStringRfc3339());
     if (parent != null) {
       metadata.setContainerName(parent);
     }
@@ -906,6 +905,9 @@ public class FsRepository implements Repository {
       } else {
         throw new RepositoryException.Builder().setCause(e).build();
       }
+    }
+    if(!docIsDirectory) {
+      metadata.setHash(generateHash(doc, item));
     }
     log.exiting("FsConnector", "getDoc");
     operations.add(operationBuilder.build());
@@ -1101,21 +1103,25 @@ public class FsRepository implements Repository {
   }
 
   /* Creates a PushItem for a Path. For Files, includes a metadataHash of the last modified date + ACL */
-  private PushItem getPushItem(Path file) throws IOException {
+  private PushItem getPushItem(Path path) throws IOException {
     PushItem pushItem = new PushItem();
-    final boolean isDirectory = delegate.isDirectory(file);
+    final boolean isDirectory = delegate.isDirectory(path);
     if(!isDirectory) {
-      Item childItem = new Item();
-      getFileAcls(file, childItem);
-
-      Hasher hasher = Hashing.farmHashFingerprint64().newHasher();
-
-      hasher.putLong(file.toFile().lastModified());
-      hasher.putUnencodedChars(String.valueOf(childItem.getAcl()));
-
-      pushItem.setMetadataHash(hasher.hash().toString());
+      Item item = new Item();
+      getFileAcls(path, item);
+      pushItem.setMetadataHash(generateHash(path, item));
     }
     return pushItem;
+  }
+
+  /* Generates a hash based on the File's last modified date and the Item's ACL */
+  private String generateHash(Path file, Item item) {
+    Hasher hasher = Hashing.farmHashFingerprint64().newHasher();
+
+    hasher.putLong(file.toFile().lastModified());
+    hasher.putUnencodedChars(String.valueOf(item.getAcl()));
+
+    return hasher.hash().toString();
   }
 
   /* Pushes the directory's content. */
