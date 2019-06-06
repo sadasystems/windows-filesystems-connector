@@ -822,11 +822,11 @@ public class FsRepository implements Repository {
     final Path doc;
 
     if (!filePatterns.isInclude(docName)) {
-      log.log(Level.INFO, "File Excluded from Index for  ::[" + docName + "]");
+      log.log(Level.INFO, "File Excluded from Index ::[" + docName + "]");
 
       return ApiOperations.deleteItem(docName);
     }
-    log.log(Level.INFO, "File Included for  Indexing for  ::[" + docName + "] status=[" + docItem.getStatus().getCode() + "]");
+    log.log(Level.INFO, "File Included for Indexing for  ::[" + docName + "] status=[" + docItem.getStatus().getCode() + "]");
 
     // Ignore ACL fragment containers. ItemType is not set in the Item passed here (or we
     // might also check to see that it's a VIRTUAL_CONTAINER_ITEM), so test for the
@@ -1186,6 +1186,10 @@ public class FsRepository implements Repository {
           log.log(Level.WARNING, "Skipping {0} because {1}.", new Object[] {file, e.getMessage()});
           continue;
         }
+        if (!filePatterns.isInclude(docId)) {
+          log.log(Level.INFO, "Do Not Push child. File Excluded from Index ::[" + docId + "]");
+          continue;
+        }
         if (children++ < largeDirectoryLimit) {
           operationBuilder.addChildId(docId, new PushItem().setMetadataHash(String.valueOf(file.toFile().lastModified())));
           log.log(Level.INFO, "Pushing::[" + docId + "] with TimeStamp::[" + String.valueOf(file.toFile().lastModified()) + "]");
@@ -1218,15 +1222,19 @@ public class FsRepository implements Repository {
         int count = 0;
         PushItems.Builder builder = new PushItems.Builder();
         for (Path path : paths) {
-          String docid;
+          String docId;
           try {
-            docid = delegate.newDocId(path);
+            docId = delegate.newDocId(path);
           } catch (IOException e) {
             log.log(Level.WARNING, "Not pushing " + path, e);
             continue;
           }
-          builder.addPushItem(docid, new PushItem().setMetadataHash(String.valueOf(path.toFile().lastModified())));
-          log.log(Level.INFO, "Pushing::[" + docid + "] with TimeStamp::[" + String.valueOf(path.toFile().lastModified()) + "]");
+          if (!filePatterns.isInclude(docId)) {
+            log.log(Level.INFO, "Do Not Push child. File Excluded from Index ::[" + docId + "]");
+            continue;
+          }
+          builder.addPushItem(docId, new PushItem().setMetadataHash(String.valueOf(path.toFile().lastModified())));
+          log.log(Level.INFO, "Pushing::[" + docId + "] with TimeStamp::[" + path.toFile().lastModified() + "]");
           count++;
           if (count % ASYNC_PUSH_ITEMS_BATCH_SIZE == 0) {
             context.postApiOperationAsync(builder.build());
