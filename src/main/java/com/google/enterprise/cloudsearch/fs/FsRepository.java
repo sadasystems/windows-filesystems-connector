@@ -35,6 +35,8 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
 import com.google.enterprise.cloudsearch.sdk.CheckpointCloseableIterable;
 import com.google.enterprise.cloudsearch.sdk.CheckpointCloseableIterableImpl;
 import com.google.enterprise.cloudsearch.sdk.InvalidConfigurationException;
@@ -54,7 +56,6 @@ import com.google.enterprise.cloudsearch.sdk.indexing.template.PushItems;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.Repository;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryContext;
 import com.google.enterprise.cloudsearch.sdk.indexing.template.RepositoryDoc;
-import org.apache.commons.codec.digest.DigestUtils;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
@@ -1107,11 +1108,12 @@ public class FsRepository implements Repository {
       Item childItem = new Item();
       getFileAcls(file, childItem);
 
-      StringBuilder hashBuilder = new StringBuilder();
-      hashBuilder.append(file.toFile().lastModified());
-      hashBuilder.append(childItem.getAcl());
+      Hasher hasher = Hashing.farmHashFingerprint64().newHasher();
 
-      pushItem.setMetadataHash(DigestUtils.md5Hex(hashBuilder.toString()));
+      hasher.putLong(file.toFile().lastModified());
+      hasher.putUnencodedChars(String.valueOf(childItem.getAcl()));
+
+      pushItem.setMetadataHash(hasher.hash().toString());
     }
     return pushItem;
   }
