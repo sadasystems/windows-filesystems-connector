@@ -986,25 +986,28 @@ public class FsRepository implements Repository {
           throw new RepositoryException.Builder().setCause(e).build();
         }
 
-        // Set up the ACL containment. Only container types have fragments. ACL fragment
-        // items are contained in their corresponding folder items, unless the folder item
-        // is a start path or DFS link, or sets inheritAclFrom to the fragment item (root
-        // items inherit from their own share ACLs).
-        String itemInheritAclFrom = item.getAcl().getInheritAclFrom();
-        for (Map.Entry<String, Acl> fragment : aclFragments.entrySet()) {
-          Item fragmentItem = fragment.getValue()
-              .createFragmentItemOf(item.getName(), fragment.getKey());
-          if (!isRoot && !fragmentItem.getName().equals(itemInheritAclFrom)) {
-            fragmentItem.setMetadata(new ItemMetadata().setContainerName(item.getName()));
-          } else {
-            log.log(Level.FINER,
-                "Not setting container for acl fragment item: " + fragmentItem.getName());
+        // if DefaultAclMode is OVERRIDE, we can skip ACL containment for the fragments (since there won't be any)
+        if(context.getDefaultAclMode() != DefaultAclMode.OVERRIDE) {
+          // Set up the ACL containment. Only container types have fragments. ACL fragment
+          // items are contained in their corresponding folder items, unless the folder item
+          // is a start path or DFS link, or sets inheritAclFrom to the fragment item (root
+          // items inherit from their own share ACLs).
+          String itemInheritAclFrom = item.getAcl().getInheritAclFrom();
+          for (Map.Entry<String, Acl> fragment : aclFragments.entrySet()) {
+            Item fragmentItem = fragment.getValue()
+                .createFragmentItemOf(item.getName(), fragment.getKey());
+            if (!isRoot && !fragmentItem.getName().equals(itemInheritAclFrom)) {
+              fragmentItem.setMetadata(new ItemMetadata().setContainerName(item.getName()));
+            } else {
+              log.log(Level.FINER,
+                  "Not setting container for acl fragment item: " + fragmentItem.getName());
+            }
+            RepositoryDoc.Builder fragmentOperationBuilder = new RepositoryDoc.Builder();
+            fragmentOperationBuilder.setItem(fragmentItem);
+            // TODO(gemerson): should we set request mode here, or let the SDK do it?
+            fragmentOperationBuilder.setRequestMode(RequestMode.ASYNCHRONOUS);
+            operations.add(fragmentOperationBuilder.build());
           }
-          RepositoryDoc.Builder fragmentOperationBuilder = new RepositoryDoc.Builder();
-          fragmentOperationBuilder.setItem(fragmentItem);
-          // TODO(gemerson): should we set request mode here, or let the SDK do it?
-          fragmentOperationBuilder.setRequestMode(RequestMode.ASYNCHRONOUS);
-          operations.add(fragmentOperationBuilder.build());
         }
       }
     } catch (IOException e) {
