@@ -878,28 +878,30 @@ public class FsRepository implements Repository {
           throw new RepositoryException.Builder().setCause(e).build();
         }
 
-        // if DefaultAclMode is OVERRIDE, we can skip ACL containment for the fragments (since there won't be any)
-        if(context.getDefaultAclMode() != DefaultAclMode.OVERRIDE) {
-          // Set up the ACL containment. Only container types have fragments. ACL fragment
-          // items are contained in their corresponding folder items, unless the folder item
-          // is a start path or DFS link, or sets inheritAclFrom to the fragment item (root
-          // items inherit from their own share ACLs).
-          String itemInheritAclFrom = item.getAcl().getInheritAclFrom();
-          for (Map.Entry<String, Acl> fragment : aclFragments.entrySet()) {
-            Item fragmentItem = fragment.getValue()
-                .createFragmentItemOf(item.getName(), fragment.getKey());
-            if (!isRoot && !fragmentItem.getName().equals(itemInheritAclFrom)) {
-              fragmentItem.setMetadata(new ItemMetadata().setContainerName(item.getName()));
-            } else {
-              log.log(Level.FINER,
-                  "Not setting container for acl fragment item: " + fragmentItem.getName());
-            }
-            RepositoryDoc.Builder fragmentOperationBuilder = new RepositoryDoc.Builder();
-            fragmentOperationBuilder.setItem(fragmentItem);
-            // TODO(gemerson): should we set request mode here, or let the SDK do it?
-            fragmentOperationBuilder.setRequestMode(RequestMode.ASYNCHRONOUS);
-            operations.add(fragmentOperationBuilder.build());
+        // Set up the ACL containment. Only container types have fragments. ACL fragment
+        // items are contained in their corresponding folder items, unless the folder item
+        // is a start path or DFS link, or sets inheritAclFrom to the fragment item (root
+        // items inherit from their own share ACLs).
+        String itemInheritAclFrom = null;
+        // note: item.getAcl() will be null when DefaultAclMode == OVERRIDE. But there won't be any aclFragments
+        // either so it's not important.
+        if(item.getAcl() != null) {
+          itemInheritAclFrom = item.getAcl().getInheritAclFrom();
+        }
+        for (Map.Entry<String, Acl> fragment : aclFragments.entrySet()) {
+          Item fragmentItem = fragment.getValue()
+              .createFragmentItemOf(item.getName(), fragment.getKey());
+          if (!isRoot && !fragmentItem.getName().equals(itemInheritAclFrom)) {
+            fragmentItem.setMetadata(new ItemMetadata().setContainerName(item.getName()));
+          } else {
+            log.log(Level.FINER,
+                "Not setting container for acl fragment item: " + fragmentItem.getName());
           }
+          RepositoryDoc.Builder fragmentOperationBuilder = new RepositoryDoc.Builder();
+          fragmentOperationBuilder.setItem(fragmentItem);
+          // TODO(gemerson): should we set request mode here, or let the SDK do it?
+          fragmentOperationBuilder.setRequestMode(RequestMode.ASYNCHRONOUS);
+          operations.add(fragmentOperationBuilder.build());
         }
       }
     } catch (IOException e) {
@@ -949,7 +951,7 @@ public class FsRepository implements Repository {
   /* Populate the document ACL in the response. */
   private Map<String, Acl> getFileAcls(Path doc, Item item) throws IOException {
     // if DefaultAclMode is OVERRIDE, we can skip setting ACL or returning any ACL fragments
-    if(context.getDefaultAclMode() != DefaultAclMode.OVERRIDE) {
+    if(context.getDefaultAclMode() == DefaultAclMode.OVERRIDE) {
       return new HashMap<>();
     }
     if (delegate.isDfsNamespace(doc)) {
