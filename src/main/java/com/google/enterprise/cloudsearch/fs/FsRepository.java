@@ -39,6 +39,8 @@ import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
 import com.google.enterprise.cloudsearch.sdk.CheckpointCloseableIterable;
 import com.google.enterprise.cloudsearch.sdk.CheckpointCloseableIterableImpl;
 import com.google.enterprise.cloudsearch.sdk.InvalidConfigurationException;
@@ -909,7 +911,7 @@ public class FsRepository implements Repository {
         return ApiOperations.deleteItem(docName);
       }
       if (ACCEPTED.toString().equals(docItem.getStatus().getCode())) {
-        log.log(Level.INFO, "Not re-indexing item because it is not modified");
+        log.log(Level.FINE, "Not re-indexing item because it is not modified");
         PushItem notModified = new PushItem().setType("NOT_MODIFIED");
         return new PushItems.Builder().addPushItem(docItem.getName(), notModified).build();
       }
@@ -917,15 +919,14 @@ public class FsRepository implements Repository {
 
     Date lastModified = new Date(attrs.lastModifiedTime().toMillis());
     Date created = new Date(attrs.creationTime().toMillis());
-    log.log(Level.INFO, "Re-indexing item::[" + docName + "] with  last modified date::[" + attrs.lastModifiedTime().toString() + "]");
+    log.log(Level.INFO, "Re-indexing item::[" + docName + "] with last modified date::[" + attrs.lastModifiedTime().toString() + "]");
 
     ItemMetadata metadata =
         new ItemMetadata()
             .setTitle(getTitle(doc))
             .setSourceRepositoryUrl(doc.toUri().toString())
             .setCreateTime(new DateTime(created).toStringRfc3339())
-            .setUpdateTime(new DateTime(lastModified).toStringRfc3339())
-            .setHash(String.valueOf(lastModified.getTime()));
+            .setUpdateTime(new DateTime(lastModified).toStringRfc3339());
     if (parent != null) {
       metadata.setContainerName(parent);
     }
@@ -1013,6 +1014,9 @@ public class FsRepository implements Repository {
         throw new RepositoryException.Builder().setCause(e).build();
       }
     }
+    if(!docIsDirectory) {
+      metadata.setHash(generateHash(doc, item));
+    }
     log.exiting("FsConnector", "getDoc");
     operations.add(operationBuilder.build());
     return ApiOperations.batch(operations.iterator());
@@ -1049,6 +1053,10 @@ public class FsRepository implements Repository {
 
   /* Populate the document ACL in the response. */
   private Map<String, Acl> getFileAcls(Path doc, Item item) throws IOException {
+    // if DefaultAclMode is OVERRIDE, we can skip setting ACL or returning any ACL fragments
+    if(context.getDefaultAclMode() != DefaultAclMode.OVERRIDE) {
+      return new HashMap<>();
+    }
     if (delegate.isDfsNamespace(doc)) {
       throw new AssertionError("getFileAcls may not be called on DFS namespace paths.");
     }
@@ -1176,14 +1184,14 @@ public class FsRepository implements Repository {
     // enforces a time limit on calls to getDoc. If there are more items in the directory
     // than the configured limit, stop at the limit and use a separate thread to send the
     // complete contents.
-    try (DirectoryStream<Path> files = delegate.newDirectoryStream(doc)) {
+    try (DirectoryStream<Path> paths = delegate.newDirectoryStream(doc)) {
       int children = 0;
-      for (Path file : files) {
+      for (Path path : paths) {
         String docId;
         try {
-          docId = delegate.newDocId(file);
+          docId = delegate.newDocId(path);
         } catch (IllegalArgumentException e) {
-          log.log(Level.WARNING, "Skipping {0} because {1}.", new Object[] {file, e.getMessage()});
+          log.log(Level.WARNING, "Skipping {0} because {1}.", new Object[] {path, e.getMessage()});
           continue;
         }
         if (!filePatterns.isInclude(docId)) {
@@ -1191,8 +1199,9 @@ public class FsRepository implements Repository {
           continue;
         }
         if (children++ < largeDirectoryLimit) {
-          operationBuilder.addChildId(docId, new PushItem().setMetadataHash(String.valueOf(file.toFile().lastModified())));
-          log.log(Level.INFO, "Pushing::[" + docId + "] with TimeStamp::[" + String.valueOf(file.toFile().lastModified()) + "]");
+          PushItem pushItem = getPushItem(path);
+          operationBuilder.addChildId(docId, pushItem);
+          log.log(Level.INFO, "Pushing::[" + docId + "] with TimeStamp::[" + String.valueOf(path.toFile().lastModified()) + "]");
         } else {
           log.log(Level.FINE, "Listing of children for {0} exceeds largeDirectoryLimit of {1}."
               + " Switching to asynchronous feed of child IDs.",
@@ -1204,6 +1213,28 @@ public class FsRepository implements Repository {
     } finally {
       setLastAccessTime(doc, lastAccessTime);
     }
+  }
+
+  /* Creates a PushItem for a Path. For Files, includes a metadataHash of the last modified date + ACL */
+  private PushItem getPushItem(Path path) throws IOException {
+    PushItem pushItem = new PushItem();
+    final boolean isDirectory = delegate.isDirectory(path);
+    if(!isDirectory) {
+      Item item = new Item();
+      getFileAcls(path, item);
+      pushItem.setMetadataHash(generateHash(path, item));
+    }
+    return pushItem;
+  }
+
+  /* Generates a hash based on the File's last modified date and the Item's ACL */
+  private String generateHash(Path file, Item item) {
+    Hasher hasher = Hashing.farmHashFingerprint64().newHasher();
+
+    hasher.putLong(file.toFile().lastModified());
+    hasher.putUnencodedChars(String.valueOf(item.getAcl()));
+
+    return hasher.hash().toString();
   }
 
   /* Pushes the directory's content. */
@@ -1233,7 +1264,8 @@ public class FsRepository implements Repository {
             log.log(Level.INFO, "Do Not Push child. File Excluded from Index ::[" + docId + "]");
             continue;
           }
-          builder.addPushItem(docId, new PushItem().setMetadataHash(String.valueOf(path.toFile().lastModified())));
+          PushItem pushItem = getPushItem(path);
+          builder.addPushItem(docId, pushItem);
           log.log(Level.INFO, "Pushing::[" + docId + "] with TimeStamp::[" + path.toFile().lastModified() + "]");
           count++;
           if (count % ASYNC_PUSH_ITEMS_BATCH_SIZE == 0) {
